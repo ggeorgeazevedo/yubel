@@ -62,9 +62,15 @@ RUN curl -sSL https://github.com/zaproxy/zaproxy/releases/latest/download/ZAP_2.
         curl -sSL "https://raw.githubusercontent.com/zaproxy/zaproxy/main/docker/$s" \
         -o "/usr/local/bin/$s" && chmod +x "/usr/local/bin/$s"; done || true
 
-# Python-based engines
-RUN pip install --no-cache-dir \
-        schemathesis graphw00f graphql-cop kube-hunter
+# Python-based engines.
+# NB: netifaces (a kube-hunter dependency) is a C extension with no prebuilt
+# wheel for Python 3.12, so it must be compiled. build-essential is installed
+# only for the build and purged in the same layer to keep the image slim.
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential \
+    && pip install --no-cache-dir schemathesis graphw00f graphql-cop kube-hunter \
+    && apt-get purge -y build-essential \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
 
 # Go binaries from stage 1
 COPY --from=gotools /gobin/nuclei /gobin/httpx /gobin/katana /gobin/dalfox /usr/local/bin/
