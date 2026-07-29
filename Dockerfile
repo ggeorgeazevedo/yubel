@@ -9,8 +9,11 @@
 # Multi-stage: grab prebuilt Go binaries, then assemble a slim runtime.
 
 # ---- stage 1: Go-based ProjectDiscovery + XSS tooling ----------------------
-FROM golang:1.22-bookworm AS gotools
-ENV GOBIN=/gobin CGO_ENABLED=0
+# NB: nuclei (and other PD tools) track a recent Go; @latest requires Go >= 1.25.
+# GOTOOLCHAIN=auto lets `go install` fetch a newer toolchain if a tool demands
+# one, so a future nuclei bump won't break this build even before we bump base.
+FROM golang:1.26-bookworm AS gotools
+ENV GOBIN=/gobin CGO_ENABLED=0 GOTOOLCHAIN=auto
 RUN mkdir -p /gobin && \
     go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest && \
     go install github.com/projectdiscovery/httpx/cmd/httpx@latest && \
