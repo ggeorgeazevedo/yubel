@@ -30,10 +30,20 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PATH="/usr/local/bin:${PATH}"
 
 # System engines available from apt / git
+# NB: nikto was removed from Debian bookworm's archive, so it is NOT installed
+# via apt here — it is fetched from upstream git below. The perl modules are
+# nikto's runtime deps: it loads XML::Writer at startup and the yubel adapter
+# runs it with `-Format json` (JSON) over HTTP/HTTPS (Net::SSLeay for TLS).
 RUN apt-get update && apt-get install -y --no-install-recommends \
         git curl ca-certificates bsdmainutils dnsutils \
-        nikto wapiti sqlmap openjdk-17-jre-headless procps \
+        wapiti sqlmap openjdk-17-jre-headless procps \
+        perl libnet-ssleay-perl libxml-writer-perl libjson-perl \
     && rm -rf /var/lib/apt/lists/*
+
+# nikto (not packaged in Debian bookworm) — install from upstream git
+RUN git clone --depth 1 https://github.com/sullo/nikto.git /opt/nikto && \
+    chmod +x /opt/nikto/program/nikto.pl && \
+    ln -s /opt/nikto/program/nikto.pl /usr/local/bin/nikto
 
 # testssl.sh (dynamic TLS assessment)
 RUN git clone --depth 1 https://github.com/testssl/testssl.sh.git /opt/testssl && \
