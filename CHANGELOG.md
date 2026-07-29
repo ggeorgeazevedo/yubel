@@ -4,6 +4,21 @@ All notable changes to Yubel are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow
 [SemVer](https://semver.org/).
 
+## [0.5.5] — 2026-07-29
+
+First release published to PyPI.
+
+### Added
+- **PyPI distribution** — `pip install yubel` now works. Wheels and sdists are
+  built and published automatically on tag via GitHub Actions using PyPI
+  Trusted Publishing (OIDC, no stored token).
+
+### Changed
+- CI hardened: ruff rule set pinned to a stable, version-independent selection
+  (pyflakes + core pycodestyle) so lint no longer breaks across ruff releases;
+  Docker/scan workflows no longer run on pull_request; Dependabot calmed to a
+  monthly, grouped cadence.
+
 ## [0.5.4] — 2026-07-28
 
 ### Fixed
@@ -155,6 +170,7 @@ Initial public release.
   **382-tool DAST landscape** (`docs/LANDSCAPE.md` + `data/dast-landscape.csv`).
 - **Tests**: full pipeline coverage without network or external binaries.
 
+[0.5.5]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.5.5
 [0.5.4]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.5.4
 [0.5.3]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.5.3
 [0.5.2]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.5.2
