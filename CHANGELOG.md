@@ -4,6 +4,14 @@ All notable changes to Yubel are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow
 [SemVer](https://semver.org/).
 
+## [0.5.7] — 2026-07-29
+
+### Changed
+- **Marketplace-ready Action name** — the composite Action's display `name` is
+  now "Yubel DAST Orchestrator" (GitHub Marketplace requires a globally unique
+  name; a bare "Yubel" collided with an existing account). This only affects the
+  Marketplace listing title — usage is unchanged (`uses: ggeorgeazevedo/yubel@…`).
+
 ## [0.5.6] — 2026-07-29
 
 ### Fixed
@@ -184,6 +192,7 @@ Initial public release.
   **382-tool DAST landscape** (`docs/LANDSCAPE.md` + `data/dast-landscape.csv`).
 - **Tests**: full pipeline coverage without network or external binaries.
 
+[0.5.7]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.5.7
 [0.5.6]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.5.6
 [0.5.5]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.5.5
 [0.5.4]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.5.4

@@ -5,7 +5,7 @@
 #     with:
 #       target: https://staging.example.com
 #       fail-on: high
-name: "Yubel"
+name: "Yubel DAST Orchestrator"
 description: "Run the Yubel multi-target DAST orchestrator in CI."
 branding:
   icon: "shield"
