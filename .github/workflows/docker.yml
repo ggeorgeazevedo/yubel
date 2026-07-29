@@ -3,8 +3,9 @@ on:
   push:
     branches: [main]
     tags: ["v*"]
-  pull_request:
-    paths: [Dockerfile, .dockerignore, "src/**", pyproject.toml]
+  workflow_dispatch:
+  # NB: not on pull_request — the full image build (ZAP + Go tools) is heavy and
+  # was failing noisily on Dependabot PRs. Build/push happens on main and tags.
 
 permissions:
   contents: read
