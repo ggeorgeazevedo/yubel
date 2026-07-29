@@ -4,6 +4,20 @@ All notable changes to Yubel are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow
 [SemVer](https://semver.org/).
 
+## [0.5.6] — 2026-07-29
+
+### Fixed
+- **Logo now renders on GitHub and PyPI** — the README referenced the logo by a
+  relative path to an SVG, which neither GitHub (serves raw SVG as text) nor
+  PyPI (no repo context) could display. It now points to an absolute raw URL of
+  a PNG rendering. Added PNG versions of the logo, emblem and social banner
+  under `docs/logo/`.
+- **Docker image builds end-to-end** — the batteries-included image now builds
+  and publishes to GHCR: nikto is fetched from upstream git (it was dropped from
+  Debian bookworm) with its Perl deps; the Go toolchain stage uses Go 1.26 (a
+  recent nuclei requires Go ≥ 1.25); and build tooling is added (then purged) so
+  the `netifaces` C extension pulled in by kube-hunter compiles.
+
 ## [0.5.5] — 2026-07-29
 
 First release published to PyPI.
@@ -170,6 +184,7 @@ Initial public release.
   **382-tool DAST landscape** (`docs/LANDSCAPE.md` + `data/dast-landscape.csv`).
 - **Tests**: full pipeline coverage without network or external binaries.
 
+[0.5.6]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.5.6
 [0.5.5]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.5.5
 [0.5.4]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.5.4
 [0.5.3]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.5.3
