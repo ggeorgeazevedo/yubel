@@ -61,6 +61,12 @@ Most tools stop at "run scanner, print findings". Because Yubel sees **every eng
 
 Yubel is the **conductor, not another instrument** — it can even orchestrate an AI-agent scanner as just one more engine, while its own core stays deterministic and offline. See a rendered report: [`docs/sample-report.html`](docs/sample-report.html).
 
+## How it works
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ggeorgeazevedo/yubel/main/docs/logo/yubel-howitworks.png" alt="How Yubel works: orchestrate best-of-breed OSS engines, normalize their output into one model, correlate (consensus, attack chains, systemic correlation, deterministic evidence trail), then decide — no LLM, no cloud, air-gapped ready." width="840">
+</p>
+
 <a name="-air-gapped-by-design"></a>
 
 ## Quick start
