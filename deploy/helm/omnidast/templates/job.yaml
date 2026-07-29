@@ -1,0 +1,68 @@
+{{- define "yubel.podSpec" -}}
+restartPolicy: Never
+serviceAccountName: {{ include "yubel.serviceAccountName" . }}
+securityContext:
+  {{- toYaml .Values.podSecurityContext | nindent 2 }}
+containers:
+  - name: yubel
+    image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+    imagePullPolicy: {{ .Values.image.pullPolicy }}
+    args: {{ toJson .Values.args }}
+    securityContext:
+      {{- toYaml .Values.securityContext | nindent 6 }}
+    resources:
+      {{- toYaml .Values.resources | nindent 6 }}
+    {{- if .Values.secretEnv }}
+    envFrom:
+      - secretRef:
+          name: {{ include "yubel.fullname" . }}-secrets
+    {{- end }}
+    volumeMounts:
+      - { name: config, mountPath: /config, readOnly: true }
+      - { name: out, mountPath: /out }
+      - { name: tmp, mountPath: /tmp }
+volumes:
+  - name: config
+    configMap: { name: {{ include "yubel.fullname" . }}-config }
+  - name: out
+    emptyDir: {}
+  - name: tmp
+    emptyDir: {}
+{{- end -}}
+{{- if eq .Values.mode "cronjob" }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "yubel.fullname" . }}
+  labels:
+    {{- include "yubel.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.schedule | quote }}
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      ttlSecondsAfterFinished: 3600
+      template:
+        metadata:
+          labels:
+            {{- include "yubel.labels" . | nindent 12 }}
+        spec:
+          {{- include "yubel.podSpec" . | nindent 10 }}
+{{- else }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "yubel.fullname" . }}
+  labels:
+    {{- include "yubel.labels" . | nindent 4 }}
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        {{- include "yubel.labels" . | nindent 8 }}
+    spec:
+      {{- include "yubel.podSpec" . | nindent 6 }}
+{{- end }}

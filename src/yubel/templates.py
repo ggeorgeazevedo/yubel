@@ -1,0 +1,74 @@
+"""Embedded starter config emitted by `yubel init`."""
+
+STARTER_CONFIG = """# Yubel configuration
+# Docs: https://github.com/ggeorgeazevedo/yubel
+# Only scan systems you are explicitly authorized to test.
+
+parallelism: 4
+include_opt_in: false        # set true to allow intrusive engines (e.g. sqlmap)
+fail_on: high                # CI gate: exit non-zero if a finding >= high
+
+# --- analysis layer (Yubel's differentiators) ---
+chains: true                 # synthesize multi-step attack chains
+cluster_threshold: 8         # collapse >=N similar info/low findings into one
+offline: false               # air-gapped: engines make no external calls (no OAST/updates)
+# baseline: baseline.json    # diff against a prior yubel.json (new/fixed/regressed)
+# fail_on_new: true          # with baseline, gate only on NEW/regressed findings
+
+# Per-engine options (all optional; sensible defaults otherwise)
+options:
+  nuclei:
+    full: true               # run the complete template set (CVEs, exposures, misconfig)
+    dast: true               # also run parameter fuzzing (needs URL params)
+    severity: "low,medium,high,critical"
+    rate_limit: 150
+  nikto:
+    maxtime: 600             # cap Nikto runtime (seconds) so it can't stall a scan
+  zap:
+    mode: full               # full | baseline
+    ajax: true               # spider single-page apps
+  wapiti:
+    scope: folder            # page | folder | domain | url
+    depth: 10
+  katana:
+    depth: 2
+    headless: true
+  schemathesis:
+    examples: 50
+
+targets:
+  # 1) A classic web application / portal / dashboard
+  - name: juice-shop
+    type: web
+    url: https://juice.example.com
+    auth:
+      kind: bearer
+      token: ${JUICE_TOKEN}   # env-var expansion keeps secrets out of git
+
+  # 2) A REST API described by an OpenAPI spec
+  - name: payments-api
+    type: api
+    url: https://api.example.com
+    openapi: https://api.example.com/openapi.json
+
+  # 3) A GraphQL endpoint
+  - name: graph
+    type: graphql
+    url: https://api.example.com/graphql
+
+  # 4) A cloud-hosted external asset (attack surface)
+  - name: marketing-site
+    type: cloud
+    url: https://www.example.com
+
+  # 5) A Kubernetes cluster (dynamic cluster pentest)
+  - name: prod-cluster
+    type: kubernetes
+    host: 10.0.0.10           # API server / node IP for remote mode
+    k8s_mode: remote          # remote | internal | pod
+
+output:
+  dir: yubel-report
+  formats: [json, html, markdown]
+  sarif: true                 # also emit SARIF for GitHub code scanning
+"""

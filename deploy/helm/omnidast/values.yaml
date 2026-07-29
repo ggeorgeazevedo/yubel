@@ -1,0 +1,48 @@
+image:
+  repository: ghcr.io/ggeorgeazevedo/yubel
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# "job" for a one-shot scan, "cronjob" for scheduled DAST
+mode: job
+schedule: "0 2 * * *"          # used when mode=cronjob (daily 02:00)
+
+resources:
+  requests: { cpu: "250m", memory: "512Mi" }
+  limits: { cpu: "2", memory: "2Gi" }
+
+# extra args passed to the yubel entrypoint
+args: ["scan", "-c", "/config/yubel.yaml", "-o", "/out"]
+
+# rendered into a ConfigMap and mounted at /config/yubel.yaml
+config:
+  parallelism: 4
+  fail_on: high
+  targets:
+    - name: app
+      type: web
+      url: http://app.default.svc.cluster.local
+    - name: cluster
+      type: kubernetes
+      k8s_mode: pod
+  output:
+    dir: /out
+    formats: [json, html, markdown]
+    sarif: true
+
+# optional secret values referenced as ${VAR} in the config
+secretEnv: {}                  # e.g. { JUICE_TOKEN: "..." }
+
+serviceAccount:
+  create: true
+  name: ""
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  seccompProfile: { type: RuntimeDefault }
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities: { drop: ["ALL"] }

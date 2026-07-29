@@ -1,0 +1,252 @@
+Metadata-Version: 2.4
+Name: yubel
+Version: 0.5.4
+Summary: The cloud-native, multi-target DAST orchestrator: one config to run ZAP, Nuclei, Nikto, Wapiti, testssl.sh, sqlmap, dalfox, schemathesis, kube-hunter and more against web, APIs, cloud, containers and Kubernetes.
+Author: Yubel contributors
+License: Apache-2.0
+Project-URL: Homepage, https://github.com/ggeorgeazevedo/yubel
+Project-URL: Documentation, https://github.com/ggeorgeazevedo/yubel#readme
+Project-URL: Issues, https://github.com/ggeorgeazevedo/yubel/issues
+Keywords: dast,security,appsec,devsecops,kubernetes,api-security,cloud-security,scanner,vulnerability
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: Topic :: Security
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Programming Language :: Python :: 3
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+License-File: LICENSE
+License-File: NOTICE
+Requires-Dist: PyYAML>=5.4
+Provides-Extra: dev
+Requires-Dist: pytest>=7; extra == "dev"
+Requires-Dist: ruff>=0.1; extra == "dev"
+Dynamic: license-file
+
+<div align="center">
+
+<img src="docs/logo/yubel-logo.svg" alt="Yubel" width="440">
+
+### the ever-watchful guardian — all-seeing dynamic security
+
+**A cloud-native, multi-target DAST orchestrator with a correlation brain.**
+
+Yubel runs the best open-source dynamic security engines — ZAP, Nuclei, Nikto, Wapiti, testssl.sh, sqlmap, dalfox, katana, schemathesis, graphql-cop, kube-hunter — against **web apps, REST/GraphQL APIs, cloud assets, containers and Kubernetes**, then does what no single scanner can: it **correlates** their output into corroborated findings and **synthesizes multi-step attack chains**. Runs installed (`pip`), in Docker, as a Kubernetes Job/CronJob, or in CI.
+
+[![CI](https://github.com/ggeorgeazevedo/yubel/actions/workflows/ci.yml/badge.svg)](https://github.com/ggeorgeazevedo/yubel/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/ggeorgeazevedo/yubel/actions/workflows/codeql.yml/badge.svg)](https://github.com/ggeorgeazevedo/yubel/actions/workflows/codeql.yml)
+[![License](https://img.shields.io/github/license/ggeorgeazevedo/yubel?color=blue)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/ggeorgeazevedo/yubel?sort=semver)](https://github.com/ggeorgeazevedo/yubel/releases)
+[![PyPI](https://img.shields.io/pypi/v/yubel)](https://pypi.org/project/yubel/)
+[![Python](https://img.shields.io/badge/python-3.9%2B-3572A5)](pyproject.toml)
+[![Docker](https://img.shields.io/badge/ghcr.io-yubel-2496ED?logo=docker&logoColor=white)](https://github.com/ggeorgeazevedo/yubel/pkgs/container/yubel)
+[![Stars](https://img.shields.io/github/stars/ggeorgeazevedo/yubel?style=social)](https://github.com/ggeorgeazevedo/yubel/stargazers)
+[![Air-gapped](https://img.shields.io/badge/air--gapped-no%20data%20egress-1f7a4d)](#-air-gapped-by-design)
+
+<sub>web · REST/GraphQL APIs · cloud · containers · Kubernetes &nbsp;|&nbsp; consensus · attack chains · systemic correlation · baseline diff · OWASP/CWE/MITRE</sub>
+
+</div>
+
+---
+
+> ### 🛡️ Air-gapped by design
+> Yubel needs **no LLM and no cloud** to work. Its core makes **zero outbound calls** — it only ever talks to the targets you point it at — so results never leave your perimeter. Add `--offline` to also stop the underlying engines from reaching external services (no OAST/interactsh, no update checks). Runs fully inside regulated, isolated and on-prem networks where AI-driven tools simply can't go. **Deterministic, reproducible, auditable** — the same scan yields the same result, every time.
+
+---
+
+## Why Yubel
+
+No single scanner is best at everything. ZAP excels at deep authenticated web crawls; Nuclei is unbeatable for templated checks and fast fuzzing; testssl.sh owns TLS; kube-hunter is the way to dynamically pentest a cluster; schemathesis tears apart OpenAPI contracts. Real programs already run several of these — badly glued together with bespoke scripts, incompatible reports and no shared severity model.
+
+**Yubel is the glue, done properly:**
+
+- **One config, many engines.** Describe your targets once; Yubel routes each to every engine that can handle it.
+- **One normalized model.** Every engine's output becomes a `Finding` on a shared 5-level severity scale, then duplicates across engines are merged (and credited).
+- **One set of reports.** JSON, a self-contained HTML dashboard, Markdown, and **SARIF** for GitHub code scanning — from the same run.
+- **Runs anywhere.** Laptop, Docker, Kubernetes Job/CronJob, or a CI pipeline with a real fail-gate.
+- **Honest and resilient.** A missing engine is skipped, not fatal. One engine crashing never kills the scan. Every execution is recorded.
+
+Yubel does **not** reinvent scanning — it stands on the shoulders of the OSS ecosystem catalogued in [`docs/LANDSCAPE.md`](docs/LANDSCAPE.md) (382 tools surveyed).
+
+## What makes Yubel different
+
+Most tools stop at "run scanner, print findings". Because Yubel sees **every engine's output for a target at once**, it adds an analysis layer that single scanners structurally cannot:
+
+- **Cross-engine consensus.** A finding independently reported by two or more engines is flagged *corroborated* and its confidence is upgraded — cutting false positives by using the engines as a jury, **deterministically** (no probabilistic LLM validator). Duplicates merge, keeping the worst severity and crediting every reporter.
+- **Attack-chain synthesis.** Yubel recognizes when separate findings combine into a real exploitation path and promotes it to its own high-impact finding — 13 rules today, e.g. *SSRF + cloud host → IMDS credential theft*, *XSS + non-HttpOnly cookie → account takeover*, *anonymous K8s API + exposed kubelet → cluster takeover*, *JWT alg=none + admin → auth bypass*, *request smuggling + cache poisoning*. No isolated scanner reports these.
+- **Systemic correlation across targets.** When the same weakness class shows up on two or more targets, Yubel raises a single *systemic* finding — "fix centrally, resolve everywhere". A tool that sees one app at a time structurally cannot.
+- **"Why we believe this" evidence trail.** Every finding carries a deterministic, reproducible rationale (which engines, corroboration, taxonomy, risk) — auditable reasoning instead of a model's guess.
+- **Baseline diff.** Point `--baseline` at a prior run and every finding is tagged **new / existing / regressed**, with **fixed** issues tracked separately. `--fail-on-new` gates CI on *newly introduced* risk only, so a backlog never blocks a pipeline.
+- **Taxonomy + risk scoring.** Every finding is mapped to **OWASP Top 10 (2021), OWASP API Top 10 (2023), CWE and MITRE ATT&CK**, given a composite **0–100 risk score**, and rolled up into a per-target **A–F grade** and an OWASP coverage matrix.
+- **Noise clustering.** 200 "missing header" hits collapse into one finding with an instance count, so real issues aren't buried.
+
+Yubel is the **conductor, not another instrument** — it can even orchestrate an AI-agent scanner as just one more engine, while its own core stays deterministic and offline. See a rendered report: [`docs/sample-report.html`](docs/sample-report.html).
+
+<a name="-air-gapped-by-design"></a>
+
+## Quick start
+
+```bash
+pip install yubel     # core (orchestrator + reporters + analysis)
+
+yubel setup                # detect & install the scanning engines (one command)
+yubel setup --install      # actually install the missing ones (brew/pip)
+yubel engines              # see what's registered and available here
+yubel selftest             # synthetic run — validates the pipeline, no network
+yubel scan -t https://example.com --fail-on high -o report/
+```
+
+Don't want to install anything? The Docker image below bundles every engine.
+
+Prefer everything bundled? The Docker image ships the orchestrator **and** the engines:
+
+```bash
+docker run --rm -v "$PWD/out:/out" ghcr.io/ggeorgeazevedo/yubel:latest \
+  scan -t https://example.com -o /out
+open out/yubel.html
+```
+
+## Targets it understands
+
+| Type | Example | Engines routed to it |
+|---|---|---|
+| `web` | app, portal, dashboard, SPA | zap, nuclei, wapiti, nikto, dalfox, testssl, katana, httpx |
+| `api` | REST + OpenAPI/Swagger | zap (api-scan), nuclei, schemathesis, wapiti, testssl |
+| `graphql` | GraphQL endpoint | graphw00f, graphql-cop, zap, schemathesis |
+| `cloud` | external/attack-surface asset | httpx, katana, nuclei, testssl |
+| `kubernetes` | cluster (remote/internal/pod) | kube-hunter, nuclei (via ingress) |
+| `container` / `host` | exposed service | httpx, nuclei, nikto, testssl |
+
+## A real config
+
+```bash
+yubel init            # writes a documented yubel.yaml
+yubel scan -c yubel.yaml -o report/
+```
+
+```yaml
+parallelism: 4
+fail_on: high            # CI gate: exit non-zero if any finding >= high
+targets:
+  - { name: shop, type: web, url: https://shop.example.com,
+      auth: { kind: bearer, token: ${SHOP_TOKEN} } }
+  - { name: payments, type: api, url: https://api.example.com,
+      openapi: https://api.example.com/openapi.json }
+  - { name: graph, type: graphql, url: https://api.example.com/graphql }
+  - { name: prod-cluster, type: kubernetes, host: 10.0.0.10, k8s_mode: remote }
+output: { dir: report, formats: [json, html, markdown], sarif: true }
+```
+
+Secrets stay out of git via `${ENV_VAR}` expansion.
+
+## Deploy
+
+<details>
+<summary><b>Kubernetes (Job / CronJob)</b></summary>
+
+```bash
+kubectl apply -f deploy/k8s/configmap.yaml
+kubectl apply -f deploy/k8s/job.yaml
+kubectl logs -f job/yubel-scan
+```
+
+Or with Helm (supports `mode: job|cronjob`, runs non-root, read-only rootfs):
+
+```bash
+helm install yubel deploy/helm/yubel \
+  --set mode=cronjob --set schedule="0 2 * * *"
+```
+
+For an **internal cluster pentest**, run the Job in-cluster with `k8s_mode: pod` — kube-hunter then probes the control plane and kubelets from inside the pod network, exactly as a compromised workload would.
+</details>
+
+<details>
+<summary><b>GitHub Actions (with SARIF upload)</b></summary>
+
+```yaml
+- uses: ggeorgeazevedo/yubel@v0
+  with:
+    target: https://staging.example.com
+    fail-on: high
+- uses: github/codeql-action/upload-sarif@v3
+  if: always()
+  with: { sarif_file: yubel-report/yubel.sarif }
+```
+
+A ready-made workflow lives in [`.github/workflows/dast.yml`](.github/workflows/dast.yml).
+</details>
+
+## Baseline / trend scanning
+
+```bash
+yubel scan -c yubel.yaml -o report/                      # run 1
+cp report/yubel.json baseline.json
+# ... later, in CI ...
+yubel scan -c yubel.yaml --baseline baseline.json \
+           --fail-on critical --fail-on-new -o report/   # fails only on NEW criticals
+```
+
+## Reports
+
+- **`yubel.html`** — editorial, self-contained assessment report: executive summary with an **A–F risk grade**, an **attack-paths** section, an **OWASP Top 10 coverage matrix**, and risk-scored findings with corroboration and taxonomy chips. Works offline, light/dark, print-friendly.
+- **`yubel.sarif`** — SARIF 2.1.0 (with `security-severity` from the risk score + OWASP/MITRE tags) → GitHub *Security → Code scanning*.
+- **`yubel.json`** — full machine-readable result: findings, enrichment, per-engine run log and the baseline diff.
+- **`yubel.md`** — Markdown summary (exec summary, attack paths, OWASP coverage, findings) for PRs/tickets.
+
+## Pipeline
+
+```
+target ─▶ registry.select_for(target) ─▶ [engines for this type, minus deny-list,
+                                           minus intrusive/opt-in]
+        ─▶ ThreadPool (bounded by parallelism)
+        ─▶ each engine: build_command → run in temp workdir → parse → [Finding]
+        ─▶ collect ─▶ dedupe (merge cross-engine dups, keep worst severity)
+        ─▶ ANALYSIS ── taxonomy (OWASP/CWE/MITRE) + risk score
+                    ├─ consensus (corroboration → confidence uplift)
+                    ├─ cluster noise (info/low repetition → 1 finding)
+                    ├─ attack-chain synthesis (composite findings)
+                    └─ baseline diff (new / existing / regressed / fixed)
+        ─▶ reporters (json/html/md/sarif) ─▶ fail-gate exit code
+```
+
+Intrusive engines (currently **sqlmap**) are **off by default** and only run when you pass `--include-intrusive` or name them explicitly with `-e sqlmap`.
+
+## Adding an engine
+
+1. Subclass `Engine` in `src/yubel/engines/`, declaring `name`, `supports`, `binary`.
+2. Implement `build_command()` and `parse()` (return normalized `Finding`s).
+3. Register it in `engines/registry.py`.
+
+That's it — availability probing, target routing, CLI listing, parallelism and reporting all come for free. See `engines/nuclei.py` for a compact reference and [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Releasing (how the badges go green)
+
+The badges light up automatically once the repo is on GitHub:
+
+- **CI / CodeQL** — run on every push/PR (green after the first successful run).
+- **License / Stars** — populate as soon as the repo is public.
+- **Release / PyPI / Docker** — populate when you cut a release:
+
+```bash
+git tag v0.3.0 && git push origin v0.3.0
+```
+
+That tag triggers `release.yml` (builds the wheel, publishes to **PyPI** via
+Trusted Publishing, and creates a **GitHub Release**) and `docker.yml` (pushes
+the image to **ghcr.io**). One-time setup: on PyPI add a *Trusted Publisher* for
+this repo (Project → Publishing → GitHub) — no API token needed. Your repo's
+**Community Standards** checklist (Insights → Community Standards) is already
+100%: README, LICENSE, CODE_OF_CONDUCT, CONTRIBUTING, SECURITY, issue templates
+and a PR template are all present.
+
+## Architecture
+
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full design and [`docs/LANDSCAPE.md`](docs/LANDSCAPE.md) for the surveyed ecosystem.
+
+## ⚠️ Legal & ethical use
+
+DAST is active testing: it sends real attack traffic. **Only scan systems you own or are explicitly authorized to test.** Intrusive engines can modify data. You are responsible for your use of Yubel. See [SECURITY.md](SECURITY.md).
+
+## License
+
+[Apache-2.0](LICENSE). Yubel orchestrates third-party engines that carry their **own** licenses (GPL, Apache, MIT, proprietary, …) — installing or bundling them is your responsibility; see [`docs/LANDSCAPE.md`](docs/LANDSCAPE.md) for each tool's license.

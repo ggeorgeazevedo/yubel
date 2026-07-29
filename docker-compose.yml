@@ -1,0 +1,18 @@
+# Yubel via docker-compose.
+#
+#   docker compose run --rm yubel scan -t https://example.com -o /out
+#   docker compose run --rm yubel scan -c /work/yubel.yaml -o /out
+#
+services:
+  yubel:
+    build: .
+    image: yubel:local
+    volumes:
+      - ./:/work:ro          # your yubel.yaml / OpenAPI specs
+      - ./out:/out           # reports land here
+    working_dir: /out
+    # example default; override on the CLI
+    command: ["selftest", "-o", "/out"]
+    environment:
+      # secrets referenced as ${VAR} inside yubel.yaml
+      - JUICE_TOKEN

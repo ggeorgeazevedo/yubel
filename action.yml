@@ -1,0 +1,47 @@
+# Yubel GitHub Action (Docker container action).
+# Runs a DAST scan and, by default, uploads SARIF to GitHub code scanning.
+#
+#   - uses: ggeorgeazevedo/yubel@v0
+#     with:
+#       target: https://staging.example.com
+#       fail-on: high
+name: "Yubel"
+description: "Run the Yubel multi-target DAST orchestrator in CI."
+branding:
+  icon: "shield"
+  color: "purple"
+inputs:
+  target:
+    description: "Target URL (for a quick single-target scan)"
+    required: false
+  type:
+    description: "Target type: web|api|graphql|cloud|kubernetes"
+    required: false
+    default: "web"
+  config:
+    description: "Path to an yubel.yaml (overrides target/type)"
+    required: false
+  openapi:
+    description: "OpenAPI/Swagger spec path or URL (api targets)"
+    required: false
+  engines:
+    description: "Comma-separated allow-list of engines"
+    required: false
+  fail-on:
+    description: "Fail the job if a finding is at/above this severity"
+    required: false
+    default: "high"
+  out:
+    description: "Output directory for reports"
+    required: false
+    default: "yubel-report"
+runs:
+  using: "docker"
+  image: "docker://ghcr.io/ggeorgeazevedo/yubel:latest"
+  args:
+    - "scan"
+    - ${{ inputs.config && format('-c={0}', inputs.config) || format('-t={0}', inputs.target) }}
+    - ${{ inputs.config && '--quiet' || format('--type={0}', inputs.type) }}
+    - "--fail-on=${{ inputs.fail-on }}"
+    - "-o=${{ inputs.out }}"
+outputs: {}

@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: yubel-config
+  labels: { app: yubel }
+data:
+  yubel.yaml: |
+    parallelism: 4
+    fail_on: high
+    targets:
+      # scan an app exposed via the cluster ingress
+      - name: shop
+        type: web
+        url: http://shop.default.svc.cluster.local
+      # dynamic pentest of the cluster itself from inside a pod
+      - name: this-cluster
+        type: kubernetes
+        k8s_mode: pod
+    output:
+      dir: /out
+      formats: [json, html, markdown]
+      sarif: true

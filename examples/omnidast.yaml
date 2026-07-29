@@ -1,0 +1,61 @@
+# Yubel configuration
+# Docs: https://github.com/ggeorgeazevedo/yubel
+# Only scan systems you are explicitly authorized to test.
+
+parallelism: 4
+include_opt_in: false        # set true to allow intrusive engines (e.g. sqlmap)
+fail_on: high                # CI gate: exit non-zero if a finding >= high
+
+# Per-engine options (all optional; sensible defaults otherwise)
+options:
+  nuclei:
+    severity: "low,medium,high,critical"
+    dast: true               # enable parameter fuzzing templates
+    rate_limit: 150
+  zap:
+    mode: full               # full | baseline
+    ajax: true               # spider single-page apps
+  wapiti:
+    scope: folder            # page | folder | domain | url
+    depth: 10
+  katana:
+    depth: 2
+    headless: true
+  schemathesis:
+    examples: 50
+
+targets:
+  # 1) A classic web application / portal / dashboard
+  - name: juice-shop
+    type: web
+    url: https://juice.example.com
+    auth:
+      kind: bearer
+      token: ${JUICE_TOKEN}   # env-var expansion keeps secrets out of git
+
+  # 2) A REST API described by an OpenAPI spec
+  - name: payments-api
+    type: api
+    url: https://api.example.com
+    openapi: https://api.example.com/openapi.json
+
+  # 3) A GraphQL endpoint
+  - name: graph
+    type: graphql
+    url: https://api.example.com/graphql
+
+  # 4) A cloud-hosted external asset (attack surface)
+  - name: marketing-site
+    type: cloud
+    url: https://www.example.com
+
+  # 5) A Kubernetes cluster (dynamic cluster pentest)
+  - name: prod-cluster
+    type: kubernetes
+    host: 10.0.0.10           # API server / node IP for remote mode
+    k8s_mode: remote          # remote | internal | pod
+
+output:
+  dir: yubel-report
+  formats: [json, html, markdown]
+  sarif: true                 # also emit SARIF for GitHub code scanning

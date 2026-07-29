@@ -1,0 +1,5 @@
+PyYAML>=5.4
+
+[dev]
+pytest>=7
+ruff>=0.1

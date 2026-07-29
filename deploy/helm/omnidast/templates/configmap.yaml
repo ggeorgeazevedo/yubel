@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "yubel.fullname" . }}-config
+  labels:
+    {{- include "yubel.labels" . | nindent 4 }}
+data:
+  yubel.yaml: |
+    {{- toYaml .Values.config | nindent 4 }}

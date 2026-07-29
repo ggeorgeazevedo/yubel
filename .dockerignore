@@ -1,0 +1,12 @@
+.git
+.github
+tests
+out
+yubel-report
+yubel-selftest
+**/__pycache__
+*.egg-info
+.venv
+venv
+.pytest_cache
+docs/img

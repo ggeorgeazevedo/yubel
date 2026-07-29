@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Yubel">
+  <title>Yubel — the ever-watchful guardian</title>
+  <path d="M64 8 L116 64 L64 120 L12 64 Z" transform="translate(0,0)"
+        fill="none" stroke="#16191d" stroke-width="3" opacity="0.9"/>
+  <g transform="translate(0,0)">
+    <path d="M28.0 52.0 Q44.0 41.0 60.0 52.0 Q44.0 63.0 28.0 52.0 Z" fill="none" stroke="#16191d" stroke-width="2.6"/><circle cx="44.0" cy="52.0" r="7.0" fill="#1f6f6b"/><circle cx="44.0" cy="52.0" r="2.9" fill="#fff"/><circle cx="44.0" cy="52.0" r="1.4" fill="#16191d"/>
+    <path d="M68.0 52.0 Q84.0 41.0 100.0 52.0 Q84.0 63.0 68.0 52.0 Z" fill="none" stroke="#16191d" stroke-width="2.6"/><circle cx="84.0" cy="52.0" r="7.0" fill="#1f6f6b"/><circle cx="84.0" cy="52.0" r="2.9" fill="#fff"/><circle cx="84.0" cy="52.0" r="1.4" fill="#16191d"/>
+    <path d="M42.0 80.0 Q64.0 65.0 86.0 80.0 Q64.0 95.0 42.0 80.0 Z" fill="none" stroke="#16191d" stroke-width="3.4"/><circle cx="64.0" cy="80.0" r="10.0" fill="#c9661f"/><circle cx="64.0" cy="80.0" r="4.2" fill="#fff"/><circle cx="64.0" cy="80.0" r="2.0" fill="#16191d"/>
+  </g>
+</svg>

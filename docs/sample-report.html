@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Yubel — Security Assessment</title>
+<style>
+:root{
+  --ink:#16191d; --body:#2b3038; --muted:#6a7280; --line:#e2e5ea;
+  --bg:#ffffff; --panel:#fbfcfd; --accent:#3f3d8c; --accent-soft:#ecebf6;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;
+}
+@media(prefers-color-scheme:dark){
+  :root{--ink:#eef1f4;--body:#c4cad2;--muted:#8b93a0;--line:#2a2f37;
+    --bg:#101317;--panel:#161a1f;--accent:#a7a3e6;--accent-soft:#20222e;}
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--body);
+  font:16px/1.6 var(--sans);}
+.wrap{max-width:960px;margin:0 auto;padding:0 28px 80px}
+a{color:var(--accent)}
+h1,h2,h3{font-family:var(--serif);color:var(--ink);font-weight:600;letter-spacing:-.01em}
+small{font-family:var(--sans);font-weight:600;font-size:.55em;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.08em;margin-left:.6em;vertical-align:middle}
+
+/* masthead */
+.mast{border-bottom:3px double var(--line);padding:34px 0 20px;margin-bottom:8px;
+  display:flex;align-items:flex-end;justify-content:space-between;gap:24px}
+.brand{display:flex;align-items:center;gap:14px}
+.eye{width:40px;height:40px;flex:none}
+.brand h1{margin:0;font-size:30px;line-height:1}
+.brand .sub{color:var(--muted);font-size:13px;margin-top:3px;
+  text-transform:uppercase;letter-spacing:.14em}
+.mast .meta{text-align:right;color:var(--muted);font-size:12.5px;line-height:1.5}
+
+/* executive summary */
+.exec{display:grid;grid-template-columns:150px 1fr;gap:28px;
+  padding:26px 0 30px;border-bottom:1px solid var(--line)}
+.gradebox{text-align:center}
+.gradebox .g{font-family:var(--serif);font-size:74px;line-height:.9;font-weight:700}
+.gradebox .s{color:var(--muted);font-size:12px;margin-top:6px;
+  text-transform:uppercase;letter-spacing:.1em}
+.exec .prose h2{margin:0 0 8px;font-size:15px;text-transform:uppercase;
+  letter-spacing:.12em;color:var(--muted)}
+.exec .prose p{margin:0 0 14px;font-size:15.5px}
+.bar{display:flex;height:12px;border-radius:2px;overflow:hidden;
+  background:var(--line);margin:2px 0 10px}
+.seg{height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--muted)}
+.lg i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}
+.lg b{color:var(--ink)}
+.diff{margin-top:12px;font-size:13px;color:var(--muted)}
+.diff .new{color:#9d2235} .diff .reg{color:#bf5a1a} .diff .fix{color:#1f7a4d}
+
+section{padding:26px 0;border-bottom:1px solid var(--line)}
+h2{font-size:22px;margin:0 0 14px}
+.section-note{color:var(--muted);font-size:14px;margin:-6px 0 16px}
+
+/* attack chains */
+.chain{border:1px solid var(--line);border-left:4px solid var(--sev);
+  border-radius:6px;padding:16px 18px;margin:14px 0;background:var(--panel)}
+.chain-hd{display:flex;align-items:baseline;gap:10px}
+.chain-hd h3{margin:0;font-size:18px}
+.chain p{font-size:14.5px}
+.chain-steps{display:flex;gap:12px;align-items:flex-start;margin:10px 0 4px}
+.chain-steps>span{font-size:11px;text-transform:uppercase;letter-spacing:.1em;
+  color:var(--muted);padding-top:3px}
+.chain-steps ol{margin:0;padding-left:18px;font-size:13.5px;color:var(--body)}
+.chain-steps li{margin:2px 0}
+.tag{color:#fff;font-size:10.5px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.06em;padding:3px 8px;border-radius:3px}
+
+/* owasp coverage */
+.cov-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.cov{border:1px solid var(--line);border-radius:6px;padding:10px 12px;
+  display:flex;flex-direction:column;gap:2px;min-height:78px;background:var(--panel)}
+.cov.off{opacity:.45}
+.cov .code{font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:700}
+.cov .ct{font-family:var(--serif);font-size:24px;color:var(--ink);line-height:1}
+.cov .nm{font-size:11px;color:var(--muted);line-height:1.25}
+.cov.on{border-color:var(--accent);background:var(--accent-soft)}
+
+/* tables */
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;
+  letter-spacing:.08em}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+code{font-family:var(--mono);font-size:12.5px}
+.st{font-size:11px;font-weight:600}
+.st-ok{color:#1f7a4d} .st-skipped{color:var(--muted)}
+.st-error,.st-timeout{color:#9d2235}
+
+/* filters */
+.filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.filters button{font:600 12px var(--sans);border:1px solid var(--line);
+  background:var(--panel);color:var(--body);padding:5px 12px;border-radius:3px;cursor:pointer}
+.filters button.active{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+
+/* findings */
+.finding{border:1px solid var(--line);border-left:4px solid var(--sev);
+  border-radius:6px;padding:15px 18px;margin:12px 0;background:var(--panel)}
+.f-hd{display:flex;gap:14px;align-items:flex-start}
+.score{font-family:var(--serif);font-size:26px;font-weight:700;color:var(--sev);
+  min-width:42px;text-align:center;line-height:1.1}
+.f-t h3{margin:0;font-size:17px}
+.f-meta{font-size:12.5px;color:var(--muted);margin-top:3px}
+.f-meta .sev{font-weight:700;text-transform:uppercase;letter-spacing:.05em;font-size:11.5px}
+.corr{color:var(--accent)}
+.stbadge{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+  padding:2px 6px;border-radius:3px;vertical-align:middle;margin-left:6px}
+.stbadge.new{background:#9d2235;color:#fff} .stbadge.regressed{background:#bf5a1a;color:#fff}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 6px}
+.chip{font:600 11px var(--mono);padding:2px 7px;border-radius:3px;
+  border:1px solid var(--line);color:var(--muted)}
+.chip.owasp{color:var(--accent);border-color:var(--accent)}
+.chip.api{color:#1f6f6b;border-color:#1f6f6b}
+.chip.mitre{color:#8a5a1a;border-color:#c9a26a}
+.chip.corrob{color:#1f7a4d;border-color:#1f7a4d;background:#1f7a4d14}
+.loc{margin:4px 0} .loc code{color:var(--body);word-break:break-all}
+.finding p{font-size:14.5px;margin:8px 0}
+.finding .fix{font-size:13.5px;color:var(--body);background:var(--accent-soft);
+  padding:8px 12px;border-radius:4px}
+.finding .why{font-size:12.5px;color:var(--muted);border-left:2px solid var(--line);
+  padding:2px 0 2px 10px;margin:8px 0}
+.finding .why b{color:var(--body)}
+details{margin:8px 0;font-size:13px}
+summary{cursor:pointer;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+pre{background:rgba(127,127,127,.09);padding:10px;border-radius:4px;overflow:auto;
+  font-size:12px;max-height:240px;margin:8px 0 0}
+.refs{font-size:12px;margin-top:8px}
+.resolved{opacity:.75} .resolved ul{list-style:none;padding:0;font-size:13.5px}
+.resolved li{padding:4px 0;border-bottom:1px solid var(--line)}
+.resolved .sev{font-weight:700;font-size:11px;text-transform:uppercase;margin-right:8px}
+.empty{color:var(--muted)}
+footer{color:var(--muted);font-size:12px;padding:26px 0 0;line-height:1.6}
+@media(max-width:640px){.exec{grid-template-columns:1fr}.cov-grid{grid-template-columns:repeat(2,1fr)}}
+@media print{.filters{display:none}.finding,.chain{break-inside:avoid}body{font-size:12px}}
+</style></head><body><div class="wrap">
+
+<div class="mast">
+  <div class="brand">
+    <svg class="eye" viewBox="0 0 100 100" aria-hidden="true">
+      <path d="M50 6 L90 50 L50 94 L10 50 Z" fill="none" stroke="var(--accent)" stroke-width="2.4" opacity="0.85"/>
+      <g stroke="var(--accent)" stroke-width="2" fill="none">
+        <path d="M26 42 Q34 34 42 42 Q34 50 26 42 Z"/>
+        <path d="M58 42 Q66 34 74 42 Q66 50 58 42 Z"/>
+        <path d="M34 64 Q50 52 66 64 Q50 76 34 64 Z"/>
+      </g>
+      <circle cx="34" cy="42" r="3.4" fill="var(--accent)"/>
+      <circle cx="66" cy="42" r="3.4" fill="var(--accent)"/>
+      <circle cx="50" cy="64" r="5" fill="var(--accent)"/>
+      <circle cx="50" cy="64" r="2" fill="var(--bg)"/>
+    </svg>
+    <div><h1>Yubel</h1><div class="sub">Security Assessment</div></div>
+  </div>
+  <div class="meta">Dynamic application security testing<br>28 Jul 2026, 19:05 -03<br>Yubel v0.4.0 · 13 findings</div>
+</div>
+
+<div class="exec">
+  <div class="gradebox">
+    <div class="g" style="color:#9d2235">F</div>
+    <div class="s">risk 100.0/100</div>
+  </div>
+  <div class="prose">
+    <h2>Executive summary</h2>
+    <p>This assessment covers 4 target(s) and 7 engine run(s), yielding 13 distinct findings. The overall posture is <b>a critical</b> (grade F, risk 100.0/100). 4 critical and 3 high-severity issues require prompt attention. Yubel's correlation engine flagged <b>2 corroborated</b> by ≥2 independent engines, <b>3 attack chain(s)</b> synthesized, <b>1 systemic</b> across targets — signal no single scanner produces in isolation.</p>
+    <div class="bar"><span class="seg" style="width:30.77%;background:#9d2235" title="Critical: 4"></span><span class="seg" style="width:23.08%;background:#bf5a1a" title="High: 3"></span><span class="seg" style="width:15.38%;background:#93790c" title="Medium: 2"></span><span class="seg" style="width:23.08%;background:#2c5282" title="Low: 3"></span><span class="seg" style="width:7.69%;background:#5b6470" title="Info: 1"></span></div>
+    <div class="legend"><span class="lg"><i style="background:#9d2235"></i>Critical <b>4</b></span> <span class="lg"><i style="background:#bf5a1a"></i>High <b>3</b></span> <span class="lg"><i style="background:#93790c"></i>Medium <b>2</b></span> <span class="lg"><i style="background:#2c5282"></i>Low <b>3</b></span> <span class="lg"><i style="background:#5b6470"></i>Info <b>1</b></span></div>
+    
+  </div>
+</div>
+
+<section><h2>Attack paths <small>3 synthesized</small></h2><p class="section-note">Composite findings Yubel derived by correlating multiple engines against the same target.</p>
+        <article class="chain" style="--sev:#9d2235">
+          <div class="chain-hd">
+            <span class="tag" style="background:#9d2235">Critical</span>
+            <h3>Attack chain: SQL injection + verbose errors → data exfiltration</h3>
+          </div>
+          <p>An injectable parameter alongside verbose database/error output lets an attacker iterate injection payloads efficiently and extract data (or achieve RCE via stacked queries).</p>
+          <div class="chain-steps"><span>chain</span><ol><li>SQL Injection (sqlmap)</li><li>Verbose database error disclosure (zap)</li></ol></div>
+          <p class="fix"><b>Remediation.</b> Use parameterized queries, disable detailed error output in production, and apply least-privilege DB accounts.</p>
+        </article>
+        <article class="chain" style="--sev:#9d2235">
+          <div class="chain-hd">
+            <span class="tag" style="background:#9d2235">Critical</span>
+            <h3>Attack chain: SSRF → cloud metadata (IMDS) credential theft</h3>
+          </div>
+          <p>A server-side request forgery reaches internal network space. On a cloud host this typically lets an attacker read the instance metadata service (169.254.169.254) and steal temporary IAM/service credentials, pivoting from a web bug to cloud account access.</p>
+          <div class="chain-steps"><span>chain</span><ol><li>Server-Side Request Forgery (nuclei)</li></ol></div>
+          <p class="fix"><b>Remediation.</b> Block outbound requests to link-local/metadata ranges, enforce IMDSv2, and allow-list egress destinations.</p>
+        </article>
+        <article class="chain" style="--sev:#9d2235">
+          <div class="chain-hd">
+            <span class="tag" style="background:#9d2235">Critical</span>
+            <h3>Attack chain: exposed K8s API + node service → cluster takeover</h3>
+          </div>
+          <p>Anonymous/unauthenticated access to the Kubernetes API together with an exposed node service (kubelet/etcd/dashboard) provides a realistic path to enumerate secrets, schedule pods and escalate to full cluster and host control.</p>
+          <div class="chain-steps"><span>chain</span><ol><li>Exposed Kubernetes API server - anonymous access (kube-hunter)</li><li>Kubelet read-only port 10255 exposed (kube-hunter)</li></ol></div>
+          <p class="fix"><b>Remediation.</b> Disable anonymous-auth, lock down kubelet (10250/10255), restrict etcd and the dashboard, and apply least-privilege RBAC + NetworkPolicies.</p>
+        </article></section>
+<section><h2>Systemic issues <small>1 across targets</small></h2><p class="section-note">The same weakness class found on multiple targets — fix once, centrally, to resolve everywhere.</p>
+        <article class="chain" style="--sev:#2c5282">
+          <div class="chain-hd">
+            <span class="tag" style="background:#2c5282">Low</span>
+            <h3>Systemic: Missing Strict-Transport-Security header across 2 targets</h3>
+          </div>
+          <p>The same issue class (Missing Strict-Transport-Security header) was found on 2 independent targets, indicating a systemic control gap rather than an isolated bug. Fixing it centrally (shared library, gateway policy, baseline hardening) resolves it everywhere at once.</p>
+          <div class="chain-steps"><span>targets</span><ol><li>payments-api</li><li>shop-web</li></ol></div>
+        </article></section>
+<section><h2>OWASP Top 10 coverage</h2><div class="cov-grid"><div class="cov on"><span class="code">A01:2021</span><span class="ct">1</span><span class="nm">Broken Access Control</span></div><div class="cov on"><span class="code">A02:2021</span><span class="ct">3</span><span class="nm">Cryptographic Failures</span></div><div class="cov on"><span class="code">A03:2021</span><span class="ct">3</span><span class="nm">Injection</span></div><div class="cov on"><span class="code">A04:2021</span><span class="ct">1</span><span class="nm">Insecure Design</span></div><div class="cov on"><span class="code">A05:2021</span><span class="ct">1</span><span class="nm">Security Misconfiguration</span></div><div class="cov off"><span class="code">A06:2021</span><span class="ct">0</span><span class="nm">Vulnerable &amp; Outdated Components</span></div><div class="cov off"><span class="code">A07:2021</span><span class="ct">0</span><span class="nm">Identification &amp; Authentication Failures</span></div><div class="cov off"><span class="code">A08:2021</span><span class="ct">0</span><span class="nm">Software &amp; Data Integrity Failures</span></div><div class="cov off"><span class="code">A09:2021</span><span class="ct">0</span><span class="nm">Security Logging &amp; Monitoring Failures</span></div><div class="cov on"><span class="code">A10:2021</span><span class="ct">2</span><span class="nm">Server-Side Request Forgery</span></div></div></section>
+<section><h2>Findings <small>9</small></h2><div class="filters" id="filters"></div><div id="findings">
+        <article class="finding" data-sev="Critical"
+                 style="--sev:#9d2235">
+          <div class="f-hd">
+            <span class="score" title="risk score">100</span>
+            <div class="f-t">
+              <h3>SQL Injection <span class="stbadge new">new</span></h3>
+              <div class="f-meta">
+                <span class="sev" style="color:#9d2235">Critical</span>
+                · sqlmap <span class="corr">+1 (nuclei)</span> · confidence high
+                
+              </div>
+            </div>
+          </div>
+          <div class="chips"><span class="chip owasp">A03:2021</span><span class="chip cwe">CWE-89</span><span class="chip mitre">T1190</span><span class="chip mitre">T1059</span><span class="chip corrob">✓ corroborated ×2</span></div>
+          <div class="loc"><code>https://api.example.com/v1/tx?account=1</code></div>
+          <p>Corroborated by 2 engines (sqlmap, nuclei).</p>
+          
+          <p class="why"><b>Why we believe this.</b> Corroborated by 2 independent engines (sqlmap, nuclei) — agreement lowers false-positive risk. Classified as CWE-89 · A03:2021 Injection · MITRE T1190, T1059. Confidence high; composite risk 100/100.</p>
+          
+          <div class="refs"><a href="https://owasp.org/" rel="noopener noreferrer">reference</a></div>
+        </article>
+        <article class="finding" data-sev="High"
+                 style="--sev:#bf5a1a">
+          <div class="f-hd">
+            <span class="score" title="risk score">82</span>
+            <div class="f-t">
+              <h3>Reflected Cross-Site Scripting <span class="stbadge new">new</span></h3>
+              <div class="f-meta">
+                <span class="sev" style="color:#bf5a1a">High</span>
+                · dalfox <span class="corr">+1 (zap)</span> · confidence high
+                
+              </div>
+            </div>
+          </div>
+          <div class="chips"><span class="chip owasp">A03:2021</span><span class="chip cwe">CWE-79</span><span class="chip mitre">T1190</span><span class="chip mitre">T1059</span><span class="chip corrob">✓ corroborated ×2</span></div>
+          <div class="loc"><code>https://shop.example.com/search?q=&lt;svg&gt;</code></div>
+          <p>Corroborated by 2 engines (dalfox, zap).</p>
+          
+          <p class="why"><b>Why we believe this.</b> Corroborated by 2 independent engines (dalfox, zap) — agreement lowers false-positive risk. Classified as CWE-79 · A03:2021 Injection · MITRE T1190, T1059. Confidence high; composite risk 82/100.</p>
+          
+          <div class="refs"><a href="https://owasp.org/" rel="noopener noreferrer">reference</a></div>
+        </article>
+        <article class="finding" data-sev="High"
+                 style="--sev:#bf5a1a">
+          <div class="f-hd">
+            <span class="score" title="risk score">74</span>
+            <div class="f-t">
+              <h3>Exposed Kubernetes API server - anonymous access <span class="stbadge new">new</span></h3>
+              <div class="f-meta">
+                <span class="sev" style="color:#bf5a1a">High</span>
+                · kube-hunter · confidence medium
+                
+              </div>
+            </div>
+          </div>
+          <div class="chips"></div>
+          <div class="loc"><code>https://10.0.0.10:6443</code></div>
+          
+          
+          <p class="why"><b>Why we believe this.</b> Reported by kube-hunter. Confidence medium; composite risk 74/100.</p>
+          
+          <div class="refs"><a href="https://owasp.org/" rel="noopener noreferrer">reference</a></div>
+        </article>
+        <article class="finding" data-sev="High"
+                 style="--sev:#bf5a1a">
+          <div class="f-hd">
+            <span class="score" title="risk score">74</span>
+            <div class="f-t">
+              <h3>Server-Side Request Forgery <span class="stbadge new">new</span></h3>
+              <div class="f-meta">
+                <span class="sev" style="color:#bf5a1a">High</span>
+                · nuclei · confidence medium
+                
+              </div>
+            </div>
+          </div>
+          <div class="chips"><span class="chip owasp">A10:2021</span><span class="chip api">API7:2023</span><span class="chip cwe">CWE-918</span><span class="chip mitre">T1190</span><span class="chip mitre">T1526</span></div>
+          <div class="loc"><code>https://shop.example.com/fetch?url=http://169.254.169.254/</code></div>
+          
+          
+          <p class="why"><b>Why we believe this.</b> Reported by nuclei. Classified as CWE-918 · A10:2021 Server-Side Request Forgery · API7:2023 Server Side Request Forgery · MITRE T1190, T1526. Confidence medium; composite risk 74/100.</p>
+          
+          <div class="refs"><a href="https://owasp.org/" rel="noopener noreferrer">reference</a></div>
+        </article>
+        <article class="finding" data-sev="Medium"
+                 style="--sev:#93790c">
+          <div class="f-hd">
+            <span class="score" title="risk score">46</span>
+            <div class="f-t">
+              <h3>Kubelet read-only port 10255 exposed <span class="stbadge new">new</span></h3>
+              <div class="f-meta">
+                <span class="sev" style="color:#93790c">Medium</span>
+                · kube-hunter · confidence medium
+                
+              </div>
+            </div>
+          </div>
+          <div class="chips"></div>
+          <div class="loc"><code>10.0.0.11:10255</code></div>
+          
+          
+          <p class="why"><b>Why we believe this.</b> Reported by kube-hunter. Confidence medium; composite risk 46/100.</p>
+          
+          <div class="refs"><a href="https://owasp.org/" rel="noopener noreferrer">reference</a></div>
+        </article>
+        <article class="finding" data-sev="Medium"
+                 style="--sev:#93790c">
+          <div class="f-hd">
+            <span class="score" title="risk score">46</span>
+            <div class="f-t">
+              <h3>Verbose database error disclosure <span class="stbadge new">new</span></h3>
+              <div class="f-meta">
+                <span class="sev" style="color:#93790c">Medium</span>
+                · zap · confidence medium
+                
+              </div>
+            </div>
+          </div>
+          <div class="chips"><span class="chip owasp">A04:2021</span><span class="chip api">API8:2023</span><span class="chip cwe">CWE-209</span><span class="chip mitre">T1190</span></div>
+          <div class="loc"><code>https://api.example.com/v1/tx</code></div>
+          
+          
+          <p class="why"><b>Why we believe this.</b> Reported by zap. Classified as CWE-209 · A04:2021 Insecure Design · API8:2023 Security Misconfiguration · MITRE T1190. Confidence medium; composite risk 46/100.</p>
+          
+          <div class="refs"><a href="https://owasp.org/" rel="noopener noreferrer">reference</a></div>
+        </article>
+        <article class="finding" data-sev="Low"
+                 style="--sev:#2c5282">
+          <div class="f-hd">
+            <span class="score" title="risk score">22</span>
+            <div class="f-t">
+              <h3>Missing Strict-Transport-Security header <span class="stbadge new">new</span></h3>
+              <div class="f-meta">
+                <span class="sev" style="color:#2c5282">Low</span>
+                · zap · confidence medium
+                
+              </div>
+            </div>
+          </div>
+          <div class="chips"><span class="chip owasp">A02:2021</span><span class="chip api">API8:2023</span><span class="chip cwe">CWE-319</span><span class="chip mitre">T1040</span><span class="chip mitre">T1557</span></div>
+          <div class="loc"><code>https://api.example.com/</code></div>
+          
+          
+          <p class="why"><b>Why we believe this.</b> Reported by zap. Classified as CWE-319 · A02:2021 Cryptographic Failures · API8:2023 Security Misconfiguration · MITRE T1040, T1557. Confidence medium; composite risk 22/100.</p>
+          
+          <div class="refs"><a href="https://owasp.org/" rel="noopener noreferrer">reference</a></div>
+        </article>
+        <article class="finding" data-sev="Low"
+                 style="--sev:#2c5282">
+          <div class="f-hd">
+            <span class="score" title="risk score">22</span>
+            <div class="f-t">
+              <h3>Missing Strict-Transport-Security header <span class="stbadge new">new</span></h3>
+              <div class="f-meta">
+                <span class="sev" style="color:#2c5282">Low</span>
+                · nuclei · confidence medium
+                
+              </div>
+            </div>
+          </div>
+          <div class="chips"><span class="chip owasp">A02:2021</span><span class="chip api">API8:2023</span><span class="chip cwe">CWE-319</span><span class="chip mitre">T1040</span><span class="chip mitre">T1557</span></div>
+          <div class="loc"><code>https://shop.example.com/</code></div>
+          
+          
+          <p class="why"><b>Why we believe this.</b> Reported by nuclei. Classified as CWE-319 · A02:2021 Cryptographic Failures · API8:2023 Security Misconfiguration · MITRE T1040, T1557. Confidence medium; composite risk 22/100.</p>
+          
+          <div class="refs"><a href="https://owasp.org/" rel="noopener noreferrer">reference</a></div>
+        </article>
+        <article class="finding" data-sev="Info"
+                 style="--sev:#5b6470">
+          <div class="f-hd">
+            <span class="score" title="risk score">6</span>
+            <div class="f-t">
+              <h3>Missing security header <span class="stbadge new">new</span></h3>
+              <div class="f-meta">
+                <span class="sev" style="color:#5b6470">Info</span>
+                · zap · confidence medium
+                · 11 instances
+              </div>
+            </div>
+          </div>
+          <div class="chips"><span class="chip owasp">A05:2021</span><span class="chip api">API8:2023</span><span class="chip cwe">CWE-16</span><span class="chip mitre">T1190</span><span class="chip mitre">T1526</span></div>
+          <div class="loc"><code>https://shop.example.com/p0</code></div>
+          <p>Clustered 11 similar occurrences across this target.</p>
+          <details><summary>evidence</summary><pre>https://shop.example.com/p0
+https://shop.example.com/p1
+https://shop.example.com/p2
+https://shop.example.com/p3
+https://shop.example.com/p4
+https://shop.example.com/p5
+https://shop.example.com/p6
+https://shop.example.com/p7
+https://shop.example.com/p8
+https://shop.example.com/p9</pre></details>
+          <p class="why"><b>Why we believe this.</b> Reported by zap. Classified as CWE-16 · A05:2021 Security Misconfiguration · API8:2023 Security Misconfiguration · MITRE T1190, T1526. 11 occurrences clustered. Confidence medium; composite risk 6/100.</p>
+          
+          
+        </article></div></section>
+
+<section><h2>Engine coverage</h2><table class="runs"><thead><tr><th>Engine</th><th>Target</th><th>Status</th><th class="num">Findings</th><th class="num">Time</th></tr></thead><tbody><tr><td><code>nuclei</code></td><td>payments-api</td><td><span class="st st-ok">ok</span></td><td class="num">2</td><td class="num">40.0s</td></tr><tr><td><code>sqlmap</code></td><td>payments-api</td><td><span class="st st-ok">ok</span></td><td class="num">1</td><td class="num">150.0s</td></tr><tr><td><code>kube-hunter</code></td><td>prod-cluster</td><td><span class="st st-ok">ok</span></td><td class="num">2</td><td class="num">61.0s</td></tr><tr><td><code>nikto</code></td><td>prod-cluster</td><td><span class="st st-skipped">skipped</span></td><td class="num">0</td><td class="num">0.0s</td></tr><tr><td><code>dalfox</code></td><td>shop-web</td><td><span class="st st-ok">ok</span></td><td class="num">1</td><td class="num">18.0s</td></tr><tr><td><code>nuclei</code></td><td>shop-web</td><td><span class="st st-ok">ok</span></td><td class="num">2</td><td class="num">63.0s</td></tr><tr><td><code>zap</code></td><td>shop-web</td><td><span class="st st-ok">ok</span></td><td class="num">13</td><td class="num">412.0s</td></tr></tbody></table></section>
+
+<footer>
+  Generated by <b>Yubel</b> — an open-source, multi-target DAST orchestrator.
+  Deterministic &amp; air-gapped by design: no LLM, no data egress — Yubel's core
+  never phones home. Findings are corroborated across independent engines; attack
+  paths and systemic issues are synthesized by correlation and should be validated
+  before remediation. Test only systems you are authorized to assess.
+</footer>
+</div>
+<script>
+const bar=document.getElementById("filters");
+if(bar){
+  const cards=[...document.querySelectorAll(".finding")];
+  const order=["All","Critical","High","Medium","Low","Info"];
+  const counts={All:cards.length};
+  cards.forEach(c=>{const s=c.dataset.sev;counts[s]=(counts[s]||0)+1;});
+  let active="All";
+  const draw=()=>{
+    bar.innerHTML=order.filter(k=>k==="All"||counts[k]).map(k=>
+      `<button data-k="${k}" class="${k===active?'active':''}">${k} ${counts[k]||0}</button>`).join("");
+    bar.querySelectorAll("button").forEach(b=>b.onclick=()=>{active=b.dataset.k;draw();
+      cards.forEach(c=>c.style.display=(active==="All"||c.dataset.sev===active)?"":"none");});
+  };
+  draw();
+}
+</script>
+</body></html>

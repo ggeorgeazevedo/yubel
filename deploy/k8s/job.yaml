@@ -1,0 +1,56 @@
+# Run Yubel as a one-shot Kubernetes Job.
+#
+#   kubectl apply -f deploy/k8s/configmap.yaml
+#   kubectl apply -f deploy/k8s/job.yaml
+#   kubectl logs -f job/yubel-scan
+#
+# For an INTERNAL cluster scan (k8s_mode: internal/pod), this in-cluster Job is
+# exactly the right vantage point: kube-hunter probes the control plane and
+# kubelets from inside the pod network.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: yubel-scan
+  labels: { app: yubel }
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels: { app: yubel }
+    spec:
+      restartPolicy: Never
+      # kube-hunter --pod mode emulates a compromised workload; give it only
+      # what it needs and nothing more.
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: yubel
+          image: ghcr.io/ggeorgeazevedo/yubel:latest
+          imagePullPolicy: IfNotPresent
+          args: ["scan", "-c", "/config/yubel.yaml", "-o", "/out"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: "250m", memory: "512Mi" }
+            limits: { cpu: "2", memory: "2Gi" }
+          volumeMounts:
+            - { name: config, mountPath: /config, readOnly: true }
+            - { name: out, mountPath: /out }
+            - { name: tmp, mountPath: /tmp }
+          env:
+            - name: JUICE_TOKEN
+              valueFrom:
+                secretKeyRef: { name: yubel-secrets, key: juice-token, optional: true }
+      volumes:
+        - name: config
+          configMap: { name: yubel-config }
+        - name: out
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
