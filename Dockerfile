@@ -18,7 +18,7 @@ RUN mkdir -p /gobin && \
     go install github.com/hahwul/dalfox/v2@latest
 
 # ---- stage 2: runtime ------------------------------------------------------
-FROM python:3.12-slim-bookworm
+FROM python:3.14-slim-bookworm
 
 LABEL org.opencontainers.image.title="Yubel" \
       org.opencontainers.image.description="Cloud-native, multi-target DAST orchestrator" \
