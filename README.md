@@ -1,6 +1,10 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/ggeorgeazevedo/yubel/main/docs/logo/yubel-logo.png" alt="Yubel" width="440">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ggeorgeazevedo/yubel/main/docs/logo/yubel-logo-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/ggeorgeazevedo/yubel/main/docs/logo/yubel-logo.png">
+  <img src="https://raw.githubusercontent.com/ggeorgeazevedo/yubel/main/docs/logo/yubel-logo.png" alt="Yubel" width="440">
+</picture>
 
 ### the ever-watchful guardian — all-seeing dynamic security
 
