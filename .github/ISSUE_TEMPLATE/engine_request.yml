@@ -1,0 +1,58 @@
+name: "🔌 New engine adapter"
+description: Propose integrating a new OSS dynamic-security engine into Yubel
+labels: ["engine", "enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Yubel wraps external engines as subprocesses. Good candidates run
+        headless, emit machine-readable output (JSON/SARIF/JSONL), and cover a
+        target type or vulnerability class we don't already handle well.
+  - type: input
+    id: tool
+    attributes:
+      label: Tool name
+      placeholder: "e.g. jwt_tool"
+    validations:
+      required: true
+  - type: input
+    id: repo
+    attributes:
+      label: Repository / homepage
+      placeholder: "https://github.com/..."
+    validations:
+      required: true
+  - type: input
+    id: license
+    attributes:
+      label: License
+      description: Important — Yubel invokes tools as separate processes; we still document each license.
+      placeholder: "MIT / Apache-2.0 / GPL-2.0 / ..."
+    validations:
+      required: true
+  - type: dropdown
+    id: target
+    attributes:
+      label: Which target type(s) does it cover?
+      multiple: true
+      options: [web, api, graphql, grpc, cloud, container, host, kubernetes]
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Machine-readable output
+      description: Does it support JSON/SARIF/JSONL output? Paste a small (redacted) sample if possible.
+      render: shell
+  - type: textarea
+    id: why
+    attributes:
+      label: What does it add that existing engines don't?
+    validations:
+      required: true
+  - type: checkboxes
+    id: intrusive
+    attributes:
+      label: Behavior
+      options:
+        - label: This tool is intrusive (modifies data / exploits) and should be opt-in.

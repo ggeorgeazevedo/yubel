@@ -1,0 +1,72 @@
+name: "🐛 Bug report"
+description: Report a defect in Yubel (the orchestrator/analysis, not a target's vulnerability)
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Yubel. Please do **not** paste findings that
+        reveal secrets or details about a system you scanned. Redact URLs/tokens.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug and what you expected instead.
+      placeholder: "Running `yubel scan ...` produced ... but I expected ..."
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The exact command(s) and (redacted) config.
+      render: shell
+      placeholder: |
+        yubel scan -t https://REDACTED --engine nuclei -o out/
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Yubel version
+      description: Output of `yubel version`
+      placeholder: "0.2.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How are you running Yubel?
+      options:
+        - pip install (local)
+        - Docker image
+        - Kubernetes Job/CronJob (Helm or manifest)
+        - GitHub Action / CI
+        - from source
+    validations:
+      required: true
+  - type: input
+    id: engine
+    attributes:
+      label: Which engine(s) are involved?
+      description: e.g. zap, nuclei, kube-hunter — or "core/analysis" if not engine-specific
+      placeholder: "nuclei"
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: OS, Python version, and engine versions if relevant.
+      render: shell
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output / logs
+      description: Console output or the `engine_runs` section of yubel.json. **Redact secrets.**
+      render: shell
+  - type: checkboxes
+    id: authorized
+    attributes:
+      label: Authorization
+      options:
+        - label: This report does not include data from systems I am not authorized to test.
+          required: true

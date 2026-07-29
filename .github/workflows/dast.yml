@@ -1,0 +1,38 @@
+name: Yubel scan
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * 1"        # weekly, Monday 03:00 UTC
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write        # required to upload SARIF
+
+jobs:
+  dast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Yubel
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/out" \
+            ghcr.io/ggeorgeazevedo/yubel:latest \
+            scan -t "${{ vars.DAST_TARGET || 'https://example.com' }}" \
+                 --fail-on high -o /out/yubel-report
+        continue-on-error: true   # let SARIF upload run even on gate failure
+
+      - name: Upload SARIF to code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: yubel-report/yubel.sarif
+
+      - name: Publish HTML/JSON reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: yubel-report
+          path: yubel-report/

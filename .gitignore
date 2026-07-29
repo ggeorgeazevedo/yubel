@@ -1,2 +1,15 @@
-report/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+yubel-report/
+yubel-selftest/
+out/
+*.sarif
+.DS_Store
 report/
