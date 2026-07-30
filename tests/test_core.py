@@ -76,7 +76,8 @@ def test_selftest_pipeline_and_reports(tmp_path):
     assert sarif["version"] == "2.1.0"
     assert sarif["runs"][0]["tool"]["driver"]["name"] == "Yubel"
     # HTML is self-contained (no external scripts)
-    html = open(os.path.join(tmp_path, "yubel.html")).read()
+    with open(os.path.join(tmp_path, "yubel.html")) as fh:
+        html = fh.read()
     assert "<script>" in html and "http-equiv" not in html
     assert "src=\"http" not in html
 

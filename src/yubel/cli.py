@@ -219,7 +219,7 @@ def _cmd_selftest(out_dir: str) -> int:
     cfg = Config(targets=[Target(type=TargetType.WEB, url="https://demo.example.com",
                                  name="selftest-target")],
                  output=OutputConfig(dir=out_dir))
-    orch = Orchestrator(cfg, progress=lambda m: print(m), selftest=True)
+    orch = Orchestrator(cfg, progress=print, selftest=True)
     result = analyze(orch.run().dedupe())
     paths = write_reports(result, out_dir, ["json", "html", "markdown"], sarif=True)
     print("\nreports:")
@@ -293,7 +293,7 @@ def _cmd_scan(args) -> int:
             print(f"config error: {e}", file=sys.stderr)
         return 1
 
-    orch = Orchestrator(cfg, progress=(None if args.quiet else (lambda m: print(m))))
+    orch = Orchestrator(cfg, progress=(None if args.quiet else print))
     result = analyze(orch.run().dedupe(), baseline_path=cfg.baseline,
                      cluster_threshold=cfg.cluster_threshold,
                      enable_chains=cfg.chains)

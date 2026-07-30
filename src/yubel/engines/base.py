@@ -53,10 +53,13 @@ class Engine:
         return f"binary '{self.binary}' not found on PATH"
 
     # ---- command construction (implemented by subclasses) --------------
-    def build_command(self, target: Target, workdir: str) -> List[str]:
+    # subclasses may take extra keyword args (e.g. nuclei's `dast`, dalfox's
+    # `url`), so the base accepts *args/**kwargs to stay signature-compatible.
+    def build_command(self, target: Target, workdir: str, *args, **kwargs) -> List[str]:
         raise NotImplementedError
 
-    def parse(self, target: Target, workdir: str, stdout: str) -> List[Finding]:
+    def parse(self, target: Target, workdir: str, stdout: str,
+              *args, **kwargs) -> List[Finding]:
         raise NotImplementedError
 
     # ---- execution ------------------------------------------------------

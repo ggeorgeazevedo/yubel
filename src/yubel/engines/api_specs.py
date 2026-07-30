@@ -58,7 +58,8 @@ class SchemathesisEngine(Engine):
                         confidence="medium",
                     ))
             except json.JSONDecodeError:
-                pass
+                # malformed JSON report — fall through to the stdout summary below
+                findings = []
         # fallback: parse stdout summary if JSON report absent
         if not findings and stdout and "FAILED" in stdout:
             findings.append(Finding(

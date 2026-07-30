@@ -3,8 +3,6 @@
 No network or external binaries: we exercise URL selection, command building and
 the orchestrator's discovery→scan seeding directly.
 """
-import os
-
 from yubel.config import Config
 from yubel.models import Finding, ScanResult, Target, TargetType
 from yubel.orchestrator import Orchestrator, DISCOVERY_ENGINES
@@ -47,7 +45,8 @@ def test_nuclei_full_pass_lists_whole_surface(tmp_path):
     t = _web(seed=["http://t.example/p?a=1", "http://t.example/static"])
     cmd = NucleiEngine().build_command(t, str(tmp_path), dast=False)
     assert "-l" in cmd and "-u" not in cmd
-    body = open(cmd[cmd.index("-l") + 1]).read()
+    with open(cmd[cmd.index("-l") + 1]) as fh:
+        body = fh.read()
     assert body.splitlines()[0] == "http://t.example"     # seed endpoint first
     assert "http://t.example/static" in body              # non-param URL included
 
@@ -58,7 +57,8 @@ def test_nuclei_dast_pass_only_fuzzes_param_urls(tmp_path):
                    "http://t.example/static"])
     cmd = NucleiEngine().build_command(t, str(tmp_path), dast=True)
     assert "-l" in cmd
-    body = open(cmd[cmd.index("-l") + 1]).read()
+    with open(cmd[cmd.index("-l") + 1]) as fh:
+        body = fh.read()
     assert "http://t.example/p?a=1" in body and "http://t.example/q?b=2" in body
     assert "http://t.example/static" not in body          # param-less URL skipped
 

@@ -257,7 +257,8 @@ def test_json_report_carries_enrichment(tmp_path):
     r = _mk(Finding("SQL Injection", "high", "nuclei", "t", cwe="89", location="/x"))
     d = analyze(r.dedupe())
     write_reports(d, str(tmp_path), ["json"], sarif=False)
-    data = json.load(open(tmp_path / "yubel.json"))
+    with open(tmp_path / "yubel.json") as fh:
+        data = json.load(fh)
     f0 = data["findings"][0]
     assert "owasp" in f0 and "risk_score" in f0 and "mitre" in f0
     assert "diff" in data

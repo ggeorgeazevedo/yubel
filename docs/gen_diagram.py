@@ -86,7 +86,6 @@ ay = top + bh/2
 for i in range(3):
     x1 = xs[i] + bw + 12
     x2 = xs[i+1] - 12
-    xm = (x1 + x2) / 2
     s.append(f'<line x1="{x1}" y1="{ay}" x2="{x2-6}" y2="{ay}" stroke="{PURPLE_L}" stroke-width="2.5"/>')
     s.append(f'<path d="M{x2-6} {ay-6} L{x2+2} {ay} L{x2-6} {ay+6} Z" fill="{PURPLE_L}"/>')
 
@@ -101,6 +100,7 @@ s.append(f'<text x="{W/2}" y="{H-22}" {MONO} font-size="15" fill="{MUTE2}" text-
 
 s.append('</svg>')
 svg = "".join(s)
-open("docs/logo/yubel-howitworks.svg", "w").write(svg)
+with open("docs/logo/yubel-howitworks.svg", "w") as fh:
+    fh.write(svg)
 cairosvg.svg2png(bytestring=svg.encode(), write_to="docs/logo/yubel-howitworks.png", output_width=1200)
 print("OK - diagrama gerado")

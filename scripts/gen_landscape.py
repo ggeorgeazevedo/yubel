@@ -37,16 +37,16 @@ def write_markdown():
         groups.setdefault(row[3], []).append(row)
     lines = ["# DAST & Dynamic Security Testing Landscape",
              "",
-             f"A curated catalog of **{len(C)} tools** that perform some form of "
-             "dynamic security testing — commercial, open source, research, "
-             "abandoned and experimental. It is the research corpus behind "
-             "Yubel's engine selection; Yubel wraps the strongest OSS "
-             "engines here and this list documents the wider ecosystem.",
+             (f"A curated catalog of **{len(C)} tools** that perform some form of "
+              "dynamic security testing — commercial, open source, research, "
+              "abandoned and experimental. It is the research corpus behind "
+              "Yubel's engine selection; Yubel wraps the strongest OSS "
+              "engines here and this list documents the wider ecosystem."),
              "",
-             "> Status legend: **Ativo** = actively maintained · **Manutencao** = "
-             "maintenance only · **Novo/Beta** = new/experimental · "
-             "**Abandonado/Descontinuado/Arquivado** = not maintained. "
-             "Columns S/N/P = Yes/No/Partial. Verify before adopting.",
+             ("> Status legend: **Ativo** = actively maintained · **Manutencao** = "
+              "maintenance only · **Novo/Beta** = new/experimental · "
+              "**Abandonado/Descontinuado/Arquivado** = not maintained. "
+              "Columns S/N/P = Yes/No/Partial. Verify before adopting."),
              ""]
     for cls in sorted(groups):
         lines.append(f"## {cls}")

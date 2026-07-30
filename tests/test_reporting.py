@@ -1,8 +1,6 @@
 """Tests for the reporting upgrade: remediation KB, the confirmed/needs-review
 tier, and evidence rendering. No network, no binaries."""
-import os
-
-from yubel.models import Finding, ScanResult, Target, TargetType
+from yubel.models import Finding, ScanResult
 from yubel.analysis import analyze
 from yubel.analysis.remediation import remediate
 from yubel.reporters.html_reporter import write_html
@@ -94,7 +92,8 @@ def test_html_report_has_proof_and_confirmed(tmp_path):
     d = _sample_result()
     p = str(tmp_path / "r.html")
     write_html(d, p)
-    doc = open(p, encoding="utf-8").read()
+    with open(p, encoding="utf-8") as fh:
+        doc = fh.read()
     assert "confirmed" in doc.lower()
     assert "Proof" in doc
     assert "parameter" in doc.lower() and "payload" in doc.lower()
@@ -106,7 +105,8 @@ def test_markdown_report_has_proof_and_remediation(tmp_path):
     d = _sample_result()
     p = str(tmp_path / "r.md")
     write_markdown(d, p)
-    doc = open(p, encoding="utf-8").read()
+    with open(p, encoding="utf-8") as fh:
+        doc = fh.read()
     assert "confirmed" in doc.lower()
     assert "**Parameter:**" in doc
     assert "**Request (proof):**" in doc
