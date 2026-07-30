@@ -4,6 +4,19 @@ All notable changes to Yubel are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow
 [SemVer](https://semver.org/).
 
+## [0.5.8] — 2026-07-29
+
+### Fixed
+- **testssl no longer reports false positives against non-HTTPS ports.** Scanning
+  a plain-HTTP endpoint (e.g. a dev server on `:3000`) made testssl emit bogus
+  "TLS 1.2 not offered", "TLS 1.3 not offered", "no Forward Secrecy" and
+  "cipherlist not offered" findings — those just mean "this isn't an HTTPS
+  endpoint", not a misconfiguration. When no SSL/TLS protocol is offered at all,
+  these "absence of TLS" rows are now suppressed. Genuine weaknesses on real TLS
+  endpoints (expired cert, BEAST, offered-but-obsolete protocols, missing FS on
+  an actual HTTPS host) are still reported. Found via a live scan of a local
+  OWASP Juice Shop instance.
+
 ## [0.5.7] — 2026-07-29
 
 ### Changed
@@ -192,6 +205,7 @@ Initial public release.
   **382-tool DAST landscape** (`docs/LANDSCAPE.md` + `data/dast-landscape.csv`).
 - **Tests**: full pipeline coverage without network or external binaries.
 
+[0.5.8]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.5.8
 [0.5.7]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.5.7
 [0.5.6]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.5.6
 [0.5.5]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.5.5

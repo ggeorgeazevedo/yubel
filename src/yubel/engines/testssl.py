@@ -52,6 +52,21 @@ class TestSSLEngine(Engine):
             rows = json.loads(raw)
         except json.JSONDecodeError:
             return []
+
+        # Does the target actually speak TLS? When scanning a plain-HTTP port
+        # (e.g. a dev server on :3000) testssl reports every protocol and cipher
+        # list as "not offered" and "no forward secrecy" — those "absence of TLS"
+        # rows are noise, not misconfigurations, and are suppressed below. A real
+        # weakness (expired cert, BEAST, an offered-but-obsolete protocol, …) is
+        # still reported.
+        proto_ids = {"sslv2", "sslv3", "tls1", "tls1_1", "tls1_2", "tls1_3"}
+        tls_offered = any(
+            str(r.get("id", "")).lower() in proto_ids
+            and "offered" in str(r.get("finding", "")).lower()
+            and "not offered" not in str(r.get("finding", "")).lower()
+            for r in rows
+        )
+
         findings: List[Finding] = []
         for r in rows:
             sev = str(r.get("severity", "INFO")).upper()
@@ -73,6 +88,13 @@ class TestSSLEngine(Engine):
             # it's testssl listing every supported cipher, not a finding. The
             # real signal is captured by cipherlist_*, cipher_order, BEAST, etc.
             if rid.startswith("cipher-"):
+                continue
+            # when the host has no TLS at all, drop the "not offered" / "no FS"
+            # rows — they only mean "this isn't an HTTPS endpoint", not a flaw
+            if not tls_offered and (
+                    ("not offered" in finding_txt
+                     and (rid in proto_ids or rid.startswith("cipherlist")))
+                    or (rid == "fs" and "forward secrecy" in finding_txt)):
                 continue
             findings.append(Finding(
                 title=f"TLS: {r.get('id', 'issue')}",
