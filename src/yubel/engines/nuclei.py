@@ -121,6 +121,7 @@ class NucleiEngine(Engine):
         cmd += [
             "-jsonl", "-o", out,
             "-silent", "-no-color",
+            "-irr",   # include request/response in output = the proof/evidence
             "-severity", self.options.get("severity", "low,medium,high,critical"),
         ]
         if dast:
@@ -156,19 +157,26 @@ class NucleiEngine(Engine):
             except json.JSONDecodeError:
                 continue
             info = ev.get("info", {})
+            matched = ev.get("matched-at", ev.get("host", ""))
             findings.append(Finding(
                 title=info.get("name", ev.get("template-id", "Nuclei finding")),
                 severity=info.get("severity", "info"),
                 engine=self.name,
                 target=target.label,
                 description=info.get("description", ""),
-                location=ev.get("matched-at", ev.get("host", "")),
+                location=matched,
                 evidence=(ev.get("extracted-results") or [""])[0]
                     if ev.get("extracted-results") else ev.get("matcher-name", ""),
+                param=_param_of(ev, matched),
+                payload=(ev.get("extracted-results") or [""])[0]
+                    if ev.get("extracted-results") else "",
+                request=_snippet(ev.get("request", ""), 4000),
+                response=_snippet(ev.get("response", ""), 2000),
                 cwe=_first(info.get("classification", {}).get("cwe-id")),
                 cve=_first(info.get("classification", {}).get("cve-id")),
                 references=info.get("reference") or [],
                 remediation=info.get("remediation", ""),
+                confidence="high" if (ev.get("request") and ev.get("response")) else "medium",
                 raw={"template": ev.get("template-id"), "mode": "dast" if dast else "full"},
             ))
         return findings
@@ -178,6 +186,29 @@ def _first(v):
     if isinstance(v, list) and v:
         return v[0]
     return v or None
+
+
+def _snippet(text: str, limit: int) -> str:
+    """Trim raw HTTP request/response to a readable, bounded proof snippet."""
+    text = (text or "").strip()
+    if len(text) > limit:
+        return text[:limit].rstrip() + "\n…(truncated)"
+    return text
+
+
+def _param_of(ev: dict, matched: str) -> str:
+    """Best-effort vulnerable-parameter extraction: nuclei's fuzzing metadata
+    first, then the query-string key of the matched URL."""
+    meta = ev.get("meta") or {}
+    for k in ("parameter", "param", "fuzzing_parameter"):
+        if meta.get(k):
+            return str(meta[k])
+    if "?" in (matched or "") and "=" in matched:
+        from urllib.parse import parse_qs, urlparse
+        qs = parse_qs(urlparse(matched).query)
+        if qs:
+            return next(iter(qs))
+    return ""
 
 
 def _auth_headers(target: Target) -> List[str]:

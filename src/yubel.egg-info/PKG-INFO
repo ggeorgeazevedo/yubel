@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: yubel
-Version: 0.6.0
+Version: 0.7.0
 Summary: The cloud-native, multi-target DAST orchestrator: one config to run ZAP, Nuclei, Nikto, Wapiti, testssl.sh, sqlmap, dalfox, schemathesis, kube-hunter and more against web, APIs, cloud, containers and Kubernetes.
 Author: Yubel contributors
 License: Apache-2.0

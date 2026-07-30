@@ -27,6 +27,10 @@ def write_sarif(result: ScanResult, path: str) -> None:
                 "id": rule_id,
                 "name": f.title[:120],
                 "shortDescription": {"text": f.title[:120]},
+                # help text carries the remediation so it shows in code scanning
+                "help": {"text": ("Remediation: " + f.remediation) if f.remediation
+                         else (f.description or f.title)},
+                "fullDescription": {"text": (f.description or f.title)[:1000]},
                 "helpUri": (f.references or ["https://owasp.org/"])[0],
                 "properties": {
                     # SARIF security-severity is a 0-10 float; map our 0-100 score
@@ -45,7 +49,9 @@ def write_sarif(result: ScanResult, path: str) -> None:
             }],
             "properties": {"engine": f.engine, "confidence": f.confidence,
                            "risk_score": f.risk_score, "status": f.status,
-                           "corroboration": f.corroboration,
+                           "verified": f.verified, "corroboration": f.corroboration,
+                           "parameter": f.param, "payload": f.payload,
+                           "remediation": f.remediation,
                            "owasp": f.owasp, "mitre": f.mitre,
                            "fingerprint": f.fingerprint},
         })

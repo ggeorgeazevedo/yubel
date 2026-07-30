@@ -134,8 +134,11 @@ class DalfoxEngine(Engine):
                     or "Cross-site scripting",
                 location=(o.get("url") or o.get("data") or o.get("param")
                           or target.endpoint()),
-                evidence=(o.get("evidence") or o.get("payload")
-                          or o.get("poc") or ""),
+                evidence=(o.get("evidence") or o.get("poc")
+                          or o.get("payload") or ""),
+                param=str(o.get("param") or ""),
+                payload=str(o.get("payload") or o.get("data") or ""),
+                request=str(o.get("poc") or ""),   # dalfox PoC is the reproducing URL
                 cwe="79",
                 confidence="high",
                 references=["https://owasp.org/www-community/attacks/xss/"],

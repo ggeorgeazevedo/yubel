@@ -24,6 +24,10 @@ def write_markdown(result: ScanResult, path: str) -> None:
                  f"{c['Low']} low, {c['Info']} info")
     if chains:
         lines.append(f"- **Attack chains synthesized:** {len(chains)}")
+    if result.findings:
+        confirmed = sum(1 for f in result.findings if f.verified)
+        lines.append(f"- **Confirmed (reproducible evidence):** {confirmed} of "
+                     f"{c['Total']} — the rest are flagged for review")
     if result.baseline:
         d = result.diff_counts()
         lines.append(f"- **vs baseline:** {d['new']} new · {d['regressed']} regressed "
@@ -77,22 +81,31 @@ def write_markdown(result: ScanResult, path: str) -> None:
             tags.append(f"CWE-{f.cwe}")
         tags += f.mitre[:2]
         stat = f" · _{f.status}_" if f.status in ("new", "regressed") else ""
+        proof = "✓ confirmed" if f.verified else "needs review"
         lines.append(f"### {i}. {f.title} — {f.severity.label} "
-                     f"(risk {f.risk_score:.0f}){stat}\n")
+                     f"(risk {f.risk_score:.0f}) · {proof}{stat}\n")
         lines.append(f"- **Engine:** {engines} · confidence {f.confidence}"
                      + (f" · corroborated ×{f.corroboration}" if f.corroboration > 1 else ""))
         if tags:
             lines.append(f"- **Taxonomy:** {' · '.join(tags)}")
         if f.location:
             lines.append(f"- **Location:** `{f.location}`")
+        if f.param:
+            lines.append(f"- **Parameter:** `{f.param}`")
+        if f.payload:
+            lines.append(f"- **Payload:** `{_clip(f.payload, 300)}`")
         if f.instances > 1:
             lines.append(f"- **Instances:** {f.instances}")
         if f.description:
             lines.append(f"\n{f.description}\n")
         if f.rationale:
             lines.append(f"- **Why we believe this:** {f.rationale}")
-        if f.evidence:
+        if f.evidence and f.evidence != f.payload:
             lines.append(f"**Evidence:**\n\n```\n{_clip(f.evidence)}\n```\n")
+        if f.request:
+            lines.append(f"**Request (proof):**\n\n```http\n{_clip(f.request)}\n```\n")
+        if f.response:
+            lines.append(f"**Response:**\n\n```http\n{_clip(f.response)}\n```\n")
         if f.remediation:
             lines.append(f"**Remediation:** {f.remediation}\n")
         rlist = [r for r in f.references if r]

@@ -20,6 +20,7 @@ src/yubel/analysis/__init__.py
 src/yubel/analysis/baseline.py
 src/yubel/analysis/chains.py
 src/yubel/analysis/correlate.py
+src/yubel/analysis/remediation.py
 src/yubel/analysis/taxonomy.py
 src/yubel/engines/__init__.py
 src/yubel/engines/api_specs.py
@@ -46,3 +47,4 @@ tests/test_analysis.py
 tests/test_core.py
 tests/test_crawl.py
 tests/test_engines.py
+tests/test_reporting.py

@@ -124,6 +124,13 @@ class Finding:
     raw: Dict[str, Any] = field(default_factory=dict)
     discovered_at: float = field(default_factory=time.time)
 
+    # ---- proof / evidence (the "where is it, prove it" trail) ----------
+    param: str = ""               # the vulnerable parameter, when known
+    payload: str = ""             # the payload/input that triggered it
+    request: str = ""             # raw HTTP request that demonstrates the issue
+    response: str = ""            # raw/snippet HTTP response that proves it
+    verified: bool = False        # deterministically confirmed (see analysis)
+
     # ---- enrichment added by the analysis pipeline ---------------------
     also_reported_by: List[str] = field(default_factory=list)  # other engines
     corroboration: int = 1        # how many engines independently reported it

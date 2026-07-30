@@ -4,6 +4,32 @@ All notable changes to Yubel are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow
 [SemVer](https://semver.org/).
 
+## [0.7.0] — 2026-07-30
+
+Reporting upgrade — **evidence of *where* the issue is, and *how* to fix it** —
+benchmarked against Invicti (proof-based scanning), Checkmarx DAST and the OWASP
+API Security Testing Framework, kept 100% deterministic.
+
+### Added
+- **Proof per finding.** Findings now carry structured evidence: the vulnerable
+  **parameter**, the **payload** that triggered it, and the raw **request /
+  response** that demonstrate it. nuclei runs with `-irr` (include request/
+  response) and dalfox surfaces its PoC/param/payload. Reports render a "Proof"
+  block (parameter · payload · evidence · collapsible request/response).
+- **Deterministic remediation KB** (`analysis/remediation.py`). Every finding
+  gets concrete, actionable fix guidance — keyed by CWE, then OWASP category,
+  then a safe generic. Engine-supplied remediation always wins; no network, no
+  model. It's the OWASP-ASTF "recommendation per finding" idea, done offline.
+- **Confirmed vs Needs-review tier.** A deterministic `verified` flag — Yubel's
+  auditable answer to proof-based scanning (no LLM, no destructive exploit): a
+  finding is *confirmed* when corroborated by ≥2 engines, synthesized as a chain,
+  backed by a payload with observable proof, or a direct transport observation;
+  otherwise it's *flagged for review*. Surfaced as a badge in the report and in
+  the executive summary.
+- Reporters (HTML/Markdown/SARIF) render the proof block, remediation and the
+  confirmed/needs-review state; SARIF `help` carries the remediation and results
+  expose `verified`/`parameter`/`payload` for code scanning.
+
 ## [0.6.0] — 2026-07-30
 
 Discovery now feeds the scanners — the crawler's output expands the attack
@@ -240,6 +266,7 @@ Initial public release.
   **382-tool DAST landscape** (`docs/LANDSCAPE.md` + `data/dast-landscape.csv`).
 - **Tests**: full pipeline coverage without network or external binaries.
 
+[0.7.0]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.7.0
 [0.6.0]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.6.0
 [0.5.8]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.5.8
 [0.5.7]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.5.7

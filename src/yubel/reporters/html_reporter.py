@@ -103,6 +103,12 @@ def _executive_lede(g, risk, counts, n_chains, n_systemic, n_corr, result) -> st
         parts.append("Yubel's correlation engine flagged " +
                      ", ".join(corr_bits) +
                      " — signal no single scanner produces in isolation.")
+    if result.findings:
+        confirmed = sum(1 for f in result.findings if f.verified)
+        review = len(result.findings) - confirmed
+        parts.append(f"<b>{confirmed} confirmed</b> with reproducible evidence "
+                     f"(corroboration, chain, or a payload with observable proof); "
+                     f"<b>{review}</b> flagged for review.")
     return " ".join(parts)
 
 
@@ -179,6 +185,31 @@ def _chip(label, kind="") -> str:
     return f'<span class="chip {kind}">{_e(label)}</span>'
 
 
+def _proof_block(f) -> str:
+    """The 'where is it / prove it' block: parameter, payload, evidence and the
+    raw request/response that demonstrate the finding."""
+    rows = []
+    if f.param:
+        rows.append(f'<div class="prow"><span>parameter</span>'
+                    f'<code>{_e(f.param)}</code></div>')
+    if f.payload:
+        rows.append(f'<div class="prow"><span>payload</span>'
+                    f'<code>{_e(f.payload)[:400]}</code></div>')
+    if f.evidence and f.evidence != f.payload:
+        rows.append(f'<div class="prow"><span>evidence</span>'
+                    f'<code>{_e(f.evidence)[:600]}</code></div>')
+    raw = ""
+    if f.request:
+        raw += (f'<details><summary>request</summary>'
+                f'<pre>{_e(f.request)}</pre></details>')
+    if f.response:
+        raw += (f'<details><summary>response</summary>'
+                f'<pre>{_e(f.response)}</pre></details>')
+    if not rows and not raw:
+        return ""
+    return f'<div class="proof"><div class="proof-hd">Proof</div>{"".join(rows)}{raw}</div>'
+
+
 def _findings_section(findings) -> str:
     if not findings:
         return '<section><h2>Findings</h2><p class="empty">No findings.</p></section>'
@@ -202,10 +233,12 @@ def _findings_section(findings) -> str:
         status_badge = ""
         if f.status in ("new", "regressed"):
             status_badge = f'<span class="stbadge {f.status}">{f.status}</span>'
-        evidence = ""
-        if f.evidence:
-            evidence = (f'<details><summary>evidence</summary>'
-                        f'<pre>{_e(f.evidence)[:2000]}</pre></details>')
+        vbadge = ('<span class="vbadge confirmed" title="reproducible evidence '
+                  '— corroborated, chained, or a payload with observable proof">'
+                  '✓ confirmed</span>' if f.verified else
+                  '<span class="vbadge review" title="single-engine heuristic — '
+                  'verify before acting">needs review</span>')
+        evidence = _proof_block(f)
         refs = ""
         # only render safe http(s) links (never javascript:/data: from a rogue
         # engine template)
@@ -221,7 +254,7 @@ def _findings_section(findings) -> str:
           <div class="f-hd">
             <span class="score" title="risk score">{f.risk_score:.0f}</span>
             <div class="f-t">
-              <h3>{_e(f.title)} {status_badge}</h3>
+              <h3>{_e(f.title)} {status_badge} {vbadge}</h3>
               <div class="f-meta">
                 <span class="sev" style="color:{_SEV[f.severity.label]}">{f.severity.label}</span>
                 · {engines} · confidence {_e(f.confidence)}
@@ -390,6 +423,23 @@ details{{margin:8px 0;font-size:13px}}
 summary{{cursor:pointer;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em}}
 pre{{background:rgba(127,127,127,.09);padding:10px;border-radius:4px;overflow:auto;
   font-size:12px;max-height:240px;margin:8px 0 0}}
+.vbadge{{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+  padding:2px 7px;border-radius:3px;vertical-align:middle;margin-left:6px}}
+.vbadge.confirmed{{background:#1f7a4d;color:#fff}}
+.vbadge.review{{background:transparent;color:var(--muted);border:1px solid var(--line)}}
+.proof{{margin:10px 0;border:1px solid var(--line);border-radius:5px;
+  background:var(--bg);overflow:hidden}}
+.proof-hd{{font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;
+  color:var(--muted);background:rgba(127,127,127,.06);padding:5px 10px;
+  border-bottom:1px solid var(--line)}}
+.prow{{display:flex;gap:10px;padding:6px 10px;font-size:12.5px;
+  border-bottom:1px solid var(--line)}}
+.prow>span{{flex:none;width:78px;color:var(--muted);text-transform:uppercase;
+  font-size:10.5px;letter-spacing:.05em;padding-top:2px}}
+.prow code{{word-break:break-all;color:var(--body)}}
+.proof details{{margin:0;border-top:1px solid var(--line)}}
+.proof summary{{padding:6px 10px}}
+.proof pre{{margin:0;border-radius:0;max-height:300px}}
 .refs{{font-size:12px;margin-top:8px}}
 .resolved{{opacity:.75}} .resolved ul{{list-style:none;padding:0;font-size:13.5px}}
 .resolved li{{padding:4px 0;border-bottom:1px solid var(--line)}}
