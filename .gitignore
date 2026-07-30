@@ -9,7 +9,9 @@ venv/
 .ruff_cache/
 yubel-report/
 yubel-selftest/
+juice-scan/
 out/
 *.sarif
+scan*.json
 .DS_Store
 report/
