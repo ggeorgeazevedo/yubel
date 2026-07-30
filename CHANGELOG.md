@@ -4,6 +4,41 @@ All notable changes to Yubel are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow
 [SemVer](https://semver.org/).
 
+## [0.6.0] — 2026-07-30
+
+Discovery now feeds the scanners — the crawler's output expands the attack
+surface instead of being a dead-end context finding.
+
+### Added
+- **Crawler → scanner wiring.** The orchestrator now runs in two phases:
+  discovery (katana / httpx) first, then the scanners. URLs katana discovers are
+  fed to the parameter engines so they cover the whole crawled surface, not just
+  the seed URL:
+  - **nuclei** runs against the URL list (`-l`): the full-template pass covers
+    the whole crawled surface, while the expensive `-dast` fuzzing pass targets
+    only *parameterized* URLs (fuzzing a param-less URL wastes time and would
+    balloon the scan on a large crawl).
+  - **dalfox** scans each discovered *parameterized* URL (`?k=v`), capped
+    (`options.dalfox.max_urls`, default 25), reusing its per-URL command.
+- **katana extracts endpoints from JavaScript** (`-jc`) and pulls known files
+  (`-kf all`, robots.txt / sitemap.xml) by default — essential for SPAs
+  (Angular/React) where routes and API paths live in the JS bundle. Toggle via
+  `options.katana.js_crawl` / `known_files`.
+- **Config + CLI controls.** `crawl` (default on) and `crawl_max_urls`
+  (default 150) in config; `--no-crawl` to disable and `--crawl-headless` to run
+  katana with a headless browser for JS/SPA apps (e.g. OWASP Juice Shop) on the
+  CLI. URL caps are logged, never a silent truncation.
+
+### Fixed
+- **katana endpoints are parsed correctly.** katana ≥ v1 nests the URL under
+  `request.endpoint` in its JSONL; the adapter read a top-level `endpoint` and
+  silently found nothing. It now reads `request.endpoint` (with a top-level
+  fallback) and skips failed-request lines (those carrying an `error`).
+
+### Notes
+- When crawling is off, or no discovery engine is installed/selected, behaviour
+  is identical to before (each engine scans only the seed URL).
+
 ## [0.5.8] — 2026-07-29
 
 ### Fixed
@@ -205,6 +240,7 @@ Initial public release.
   **382-tool DAST landscape** (`docs/LANDSCAPE.md` + `data/dast-landscape.csv`).
 - **Tests**: full pipeline coverage without network or external binaries.
 
+[0.6.0]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.6.0
 [0.5.8]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.5.8
 [0.5.7]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.5.7
 [0.5.6]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.5.6

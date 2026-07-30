@@ -65,6 +65,10 @@ class Target:
     auth: Auth = field(default_factory=Auth)
     tags: List[str] = field(default_factory=list)
     name: Optional[str] = None
+    #: URLs discovered by the crawler at runtime (katana), fed to the parameter
+    #: scanners (nuclei -l / dalfox) so they cover the whole attack surface, not
+    #: just the seed URL. Populated by the orchestrator's discovery phase.
+    seed_urls: List[str] = field(default_factory=list)
 
     def __post_init__(self):
         if isinstance(self.type, str):
@@ -82,6 +86,24 @@ class Target:
         if self.host and self.port:
             return f"{self.host}:{self.port}"
         return self.host or ""
+
+    def scan_urls(self, limit: int = 0) -> List[str]:
+        """The seed endpoint plus any crawler-discovered URLs, de-duplicated
+        (endpoint first). `limit > 0` caps the total."""
+        seen, out = set(), []
+        for u in [self.endpoint(), *self.seed_urls]:
+            u = (u or "").strip()
+            if u and u not in seen:
+                seen.add(u)
+                out.append(u)
+        return out[:limit] if limit and limit > 0 else out
+
+    def param_urls(self, limit: int = 0) -> List[str]:
+        """Discovered URLs that carry a query string (`?k=v`) — the only ones a
+        parameter scanner like dalfox can actually test. Falls back to the seed
+        endpoint if it has parameters and nothing else was discovered."""
+        urls = [u for u in self.scan_urls() if "?" in u and "=" in u]
+        return urls[:limit] if limit and limit > 0 else urls
 
 
 @dataclass

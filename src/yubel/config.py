@@ -40,6 +40,8 @@ class Config:
     baseline: Optional[str] = None                            # prior yubel.json
     chains: bool = True                                       # attack-chain synth
     cluster_threshold: int = 8                                # noise clustering
+    crawl: bool = True                                        # feed crawler URLs to scanners
+    crawl_max_urls: int = 150                                 # cap URLs fed downstream
     output: OutputConfig = field(default_factory=OutputConfig)
 
     @staticmethod
@@ -69,6 +71,8 @@ class Config:
             baseline=_expand(data.get("baseline")),
             chains=bool(data.get("chains", True)),
             cluster_threshold=int(data.get("cluster_threshold", 8)),
+            crawl=bool(data.get("crawl", True)),
+            crawl_max_urls=int(data.get("crawl_max_urls", 150)),
             output=OutputConfig(
                 dir=out.get("dir", "yubel-report"),
                 formats=out.get("formats", ["json", "html", "markdown"]),

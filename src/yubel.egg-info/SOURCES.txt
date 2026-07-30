@@ -44,4 +44,5 @@ src/yubel/reporters/markdown_reporter.py
 src/yubel/reporters/sarif_reporter.py
 tests/test_analysis.py
 tests/test_core.py
+tests/test_crawl.py
 tests/test_engines.py

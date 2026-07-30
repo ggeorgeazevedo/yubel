@@ -100,9 +100,25 @@ class NucleiEngine(Engine):
 
     def build_command(self, target: Target, workdir: str, dast: bool = False) -> List[str]:
         out = os.path.join(workdir, f"nuclei-{'dast' if dast else 'full'}.jsonl")
-        cmd = [
-            self.binary,
-            "-u", target.endpoint(),
+        cmd = [self.binary]
+        # Full-template pass scans the whole crawled surface; the (expensive)
+        # dast fuzzing pass only targets URLs that actually carry parameters —
+        # fuzzing a parameter-less URL wastes time and explodes the scan on large
+        # crawls. With no discovery this collapses to the seed endpoint as before.
+        urls = target.param_urls() if dast else target.scan_urls()
+        if not urls:
+            urls = [target.endpoint()]
+        if len(urls) > 1:
+            listfile = os.path.join(workdir, "urls.txt")
+            try:
+                with open(listfile, "w", encoding="utf-8") as fh:
+                    fh.write("\n".join(urls) + "\n")
+                cmd += ["-l", listfile]
+            except OSError:
+                cmd += ["-u", urls[0]]
+        else:
+            cmd += ["-u", urls[0]]
+        cmd += [
             "-jsonl", "-o", out,
             "-silent", "-no-color",
             "-severity", self.options.get("severity", "low,medium,high,critical"),

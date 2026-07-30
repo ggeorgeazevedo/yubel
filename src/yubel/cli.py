@@ -86,6 +86,12 @@ def main(argv: Optional[List[str]] = None) -> int:
                     help="air-gapped hardening: engines make no external calls "
                          "(no OAST/interactsh, no update checks). Yubel's core "
                          "never phones home regardless.")
+    ps.add_argument("--no-crawl", action="store_true",
+                    help="do not feed crawler-discovered URLs to the parameter "
+                         "scanners (scan only the seed URL of each target)")
+    ps.add_argument("--crawl-headless", action="store_true",
+                    help="run the katana crawler with a headless browser so it "
+                         "discovers endpoints in JS/SPA apps (needs Chrome/Chromium)")
     ps.add_argument("-q", "--quiet", action="store_true")
 
     # engines ------------------------------------------------------------
@@ -273,6 +279,10 @@ def _cmd_scan(args) -> int:
         cfg.offline = True
     if cfg.offline:
         _apply_offline(cfg)
+    if args.no_crawl:
+        cfg.crawl = False
+    if args.crawl_headless:
+        cfg.options.setdefault("katana", {})["headless"] = True
     cfg.output.dir = args.out
     if args.format:
         cfg.output.formats = args.format

@@ -26,23 +26,40 @@ class KatanaEngine(Engine):
         out = os.path.join(workdir, "katana.jsonl")
         cmd = [self.binary, "-u", target.endpoint(), "-jsonl", "-o", out,
                "-silent", "-d", str(self.options.get("depth", 2))]
+        # -jc: parse endpoints out of in-page JavaScript (essential for SPAs like
+        #      Angular/React, where routes and API paths live in the JS bundle);
+        # -kf: pull known files (robots.txt / sitemap.xml) for extra surface.
+        if self.options.get("js_crawl", True):
+            cmd += ["-jc"]
+        if self.options.get("known_files", True):
+            cmd += ["-kf", "all"]
         if self.options.get("headless"):
             cmd += ["-headless", "-no-sandbox"]
         return cmd
 
     def parse(self, target: Target, workdir: str, stdout: str) -> List[Finding]:
         text = self._read(os.path.join(workdir, "katana.jsonl")) or stdout
-        urls = []
+        urls, seen = [], set()
         for line in text.splitlines():
             line = line.strip()
             if line.startswith("{"):
                 try:
-                    urls.append(json.loads(line).get("endpoint", ""))
+                    o = json.loads(line)
                 except json.JSONDecodeError:
                     continue
+                if o.get("error"):          # failed request, not a real endpoint
+                    continue
+                # katana ≥ v1 nests the URL under "request"; older builds and the
+                # plain (-o) output put it at the top level — support both.
+                req = o.get("request") or {}
+                ep = req.get("endpoint") or o.get("endpoint") or ""
             elif line.startswith("http"):
-                urls.append(line)
-        urls = [u for u in urls if u]
+                ep = line
+            else:
+                continue
+            if ep and ep not in seen:
+                seen.add(ep)
+                urls.append(ep)
         if not urls:
             return []
         # write surface to workdir sibling for other tooling / debugging

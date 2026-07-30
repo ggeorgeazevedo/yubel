@@ -9,10 +9,13 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
-from typing import List
+import tempfile
+import time
+from typing import List, Tuple
 
-from ..models import Finding, Target, TargetType
+from ..models import EngineRun, Finding, Target, TargetType
 from .base import Engine
 
 
@@ -37,8 +40,72 @@ class DalfoxEngine(Engine):
                 DalfoxEngine._major = 2
         return self._major
 
-    def build_command(self, target: Target, workdir: str) -> List[str]:
-        url = target.endpoint()
+    def run(self, target: Target) -> Tuple[List[Finding], EngineRun]:
+        """dalfox only tests URLs that carry parameters. When the discovery
+        phase surfaced parameterized URLs we scan each of them (capped); with no
+        discovery we fall back to the seed endpoint, exactly as before."""
+        rec = EngineRun(engine=self.name, target=target.label)
+        rec.started_at = time.time()
+        if not self.handles(target):
+            rec.status = "skipped"
+            rec.message = f"does not handle target type {target.type}"
+            rec.finished_at = time.time()
+            return [], rec
+        if not self.available():
+            rec.status = "skipped"
+            rec.message = self.unavailable_reason()
+            rec.finished_at = time.time()
+            return [], rec
+
+        urls = target.param_urls(int(self.options.get("max_urls", 25))) \
+            or [target.endpoint()]
+        findings: List[Finding] = []
+        cmds: List[str] = []
+        errors: List[str] = []
+        any_ok = False
+        for url in urls:
+            fs, cmd, err = self._scan_url(target, url)
+            findings.extend(fs)
+            cmds.append(cmd)
+            if err:
+                errors.append(err)
+            else:
+                any_ok = True
+        rec.command = cmds[0] + (f"   (+{len(cmds) - 1} more URL(s))"
+                                 if len(cmds) > 1 else "")
+        rec.findings = len(findings)
+        rec.status = "ok" if any_ok else (
+            "timeout" if any("timeout" in e for e in errors) else "error")
+        if errors and not findings:
+            rec.message = errors[-1]
+        rec.finished_at = time.time()
+        return findings, rec
+
+    def _scan_url(self, target: Target, url: str) -> Tuple[List[Finding], str, str]:
+        workdir = tempfile.mkdtemp(prefix="yubel-dalfox-")
+        try:
+            cmd = self.build_command(target, workdir, url)
+            proc = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=self.timeout(),
+                cwd=workdir, env={**os.environ, "NO_COLOR": "1"})
+            fs = self.parse(target, workdir, proc.stdout)
+            if proc.returncode not in self._ok_returncodes() and not fs:
+                tail = (proc.stderr or proc.stdout or "").strip().splitlines()
+                return [], " ".join(cmd), (tail[-1] if tail else f"exit={proc.returncode}")
+            return fs, " ".join(cmd), ""
+        except subprocess.TimeoutExpired:
+            return [], "dalfox", f"timeout {self.timeout()}s"
+        except FileNotFoundError as e:
+            return [], "dalfox", str(e)
+        except Exception as e:
+            return [], "dalfox", f"{type(e).__name__}: {e}"
+        finally:
+            if not self.options.get("keep_workdir"):
+                shutil.rmtree(workdir, ignore_errors=True)
+
+    def build_command(self, target: Target, workdir: str,
+                      url: str = None) -> List[str]:
+        url = url or target.endpoint()
         if self._major_version() >= 3:
             # dalfox 3.x: URL is a named argument, JSON goes to stdout
             cmd = [self.binary, "url", "--url", url, "--format", "json", "--silence"]
