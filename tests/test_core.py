@@ -106,3 +106,41 @@ def test_config_from_dict_env_expansion(monkeypatch):
 def test_config_validation_errors():
     cfg = Config()
     assert "no targets defined" in cfg.validate()
+
+
+def test_sarif_uris_are_checkout_relative(tmp_path):
+    """GitHub code scanning rejects absolute URIs in artifactLocation.
+
+    It resolves every URI against the checkout (scheme `file`), so an
+    `https://` target — or a bare `host:port/...`, whose host the parser reads
+    as a scheme — kills the whole upload with "SARIF URI scheme ... did not
+    match the checkout URI scheme file".
+    """
+    from urllib.parse import urlparse
+    from yubel.reporters.sarif_reporter import _artifact_uri
+
+    for raw in ["https://demo.example.com/items?id=1", "example.com:8080/admin",
+                "https://[2001:db8::1]:8443/x", "arn:aws:s3:::my-bucket/key",
+                "k8s-control-plane", "/just/a/path", "", "   "]:
+        uri = _artifact_uri(raw)
+        assert uri, f"empty uri for {raw!r}"
+        assert not urlparse(uri).scheme, f"{raw!r} -> {uri!r} still has a scheme"
+        assert not uri.startswith("/"), f"{raw!r} -> {uri!r} is absolute"
+        assert ".." not in uri.split("/"), f"{raw!r} -> {uri!r} escapes the tree"
+
+
+def test_sarif_results_carry_url_and_fingerprint(tmp_path):
+    cfg = Config(targets=[Target(type=TargetType.WEB, url="http://demo")])
+    res = Orchestrator(cfg, selftest=True).run().dedupe()
+    write_reports(res, str(tmp_path), ["json"], sarif=True)
+    with open(os.path.join(tmp_path, "yubel.sarif")) as fh:
+        sarif = json.load(fh)
+
+    results = sarif["runs"][0]["results"]
+    assert results, "selftest result produced no SARIF results"
+    for r in results:
+        # the pseudo-path is not human-readable, so the real URL has to survive
+        assert r["properties"]["url"] in r["message"]["text"]
+        # stable id, so code scanning tracks an alert across runs
+        assert isinstance(r["partialFingerprints"]["yubel/v1"], str)
+        assert r["partialFingerprints"]["yubel/v1"]
