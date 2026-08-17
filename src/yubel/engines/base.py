@@ -54,13 +54,20 @@ class Engine:
         return f"binary '{self.binary}' not found on PATH"
 
     # ---- command construction (implemented by subclasses) --------------
-    # subclasses may take extra keyword args (e.g. nuclei's `dast`, dalfox's
-    # `url`), so the base accepts *args/**kwargs to stay signature-compatible.
-    def build_command(self, target: Target, workdir: str, *args, **kwargs) -> List[str]:
+    # This is the contract every engine must honour, and `run()` below calls
+    # exactly this: two positional arguments, no more. A subclass may *widen*
+    # it with extra optional parameters — nuclei takes `dast`, dalfox takes
+    # `url`, and both drive those from their own `run()` — but it has to stay
+    # callable with just (target, workdir).
+    #
+    # The base used to declare *args/**kwargs to "stay compatible". That is
+    # backwards: it advertised a wider contract than any of the twelve engines
+    # implements, so a caller trusting the base signature could pass arguments
+    # that every implementation rejects at runtime.
+    def build_command(self, target: Target, workdir: str) -> List[str]:
         raise NotImplementedError
 
-    def parse(self, target: Target, workdir: str, stdout: str,
-              *args, **kwargs) -> List[Finding]:
+    def parse(self, target: Target, workdir: str, stdout: str) -> List[Finding]:
         raise NotImplementedError
 
     # ---- execution ------------------------------------------------------
