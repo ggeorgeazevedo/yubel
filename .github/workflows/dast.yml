@@ -11,22 +11,66 @@ permissions:
   contents: read
   security-events: write        # required to upload SARIF
 
+env:
+  REPORT_DIR: yubel-report
+
 jobs:
   dast:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
-      - name: Run Yubel
+      # The image runs as the non-root user `yubel` (uid 10001, see Dockerfile)
+      # while the runner workspace is owned by uid 1001 with mode 755. Mounting
+      # the whole workspace and asking yubel to create a subdirectory inside it
+      # makes write_reports() -> os.makedirs() raise PermissionError, so *no*
+      # report is written at all. Create the directory on the host, make it
+      # writable, and mount that directory directly onto /out.
+      - name: Prepare report directory
         run: |
-          docker run --rm -v "${{ github.workspace }}:/out" \
+          mkdir -p "${GITHUB_WORKSPACE}/${REPORT_DIR}"
+          chmod 777 "${GITHUB_WORKSPACE}/${REPORT_DIR}"
+
+      - name: Run Yubel
+        id: scan
+        env:
+          # via env, not inline ${{ }}, to avoid shell injection from repo vars
+          DAST_TARGET: ${{ vars.DAST_TARGET || 'https://example.com' }}
+        run: |
+          set +e
+          docker run --rm -v "${GITHUB_WORKSPACE}/${REPORT_DIR}:/out" \
             ghcr.io/ggeorgeazevedo/yubel:latest \
-            scan -t "${{ vars.DAST_TARGET || 'https://example.com' }}" \
-                 --fail-on high -o /out/yubel-report
-        continue-on-error: true   # let SARIF upload run even on gate failure
+            scan -t "${DAST_TARGET}" --fail-on high -o /out
+          code=$?
+          set -e
+          echo "exit-code=${code}" >> "$GITHUB_OUTPUT"
+          echo "--- contents of ${REPORT_DIR} ---"
+          ls -la "${GITHUB_WORKSPACE}/${REPORT_DIR}" || true
+          if [ "${code}" -eq 0 ]; then
+            echo "Scan clean: nothing at or above the gate threshold."
+          elif [ "${code}" -eq 2 ]; then
+            echo "::warning title=Yubel gate::Findings at or above 'high'. Reports are still published."
+          else
+            echo "::error title=Yubel failed::yubel exited with ${code} (not a gate failure). See the log above."
+            exit "${code}"
+          fi
+
+      # upload-sarif hard-fails on a missing path, which is what turned an
+      # empty report directory into a red job. Only call it when the file
+      # is actually there.
+      - name: Check for SARIF
+        id: sarif
+        if: always()
+        run: |
+          if [ -s "${GITHUB_WORKSPACE}/${REPORT_DIR}/yubel.sarif" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=No SARIF::${REPORT_DIR}/yubel.sarif was not produced - skipping the code scanning upload."
+          fi
 
       - name: Upload SARIF to code scanning
-        if: always()
+        if: always() && steps.sarif.outputs.found == 'true'
         uses: github/codeql-action/upload-sarif@v4.37.3
         with:
           sarif_file: yubel-report/yubel.sarif
@@ -37,3 +81,4 @@ jobs:
         with:
           name: yubel-report
           path: yubel-report/
+          if-no-files-found: warn
