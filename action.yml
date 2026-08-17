@@ -1,15 +1,27 @@
-# Yubel GitHub Action (Docker container action).
-# Runs a DAST scan and, by default, uploads SARIF to GitHub code scanning.
+# Yubel GitHub Action (composite).
+#
+# Runs a DAST scan in the published container and leaves the reports in
+# `out` (default `yubel-report/`). SARIF upload to GitHub code scanning is
+# opt-in via `upload-sarif: true` — see the README for the two-step form.
 #
 #   - uses: ggeorgeazevedo/yubel@v0
 #     with:
 #       target: https://staging.example.com
 #       fail-on: high
+#
+# NB: this is a composite action rather than a `using: docker` one on purpose.
+# The image runs as the non-root user `yubel` (uid 10001) and the runner
+# workspace is owned by uid 1001 with mode 755, so a docker container action
+# could not create its own output directory inside the mount — every report,
+# SARIF included, was silently lost. Doing the `docker run` here lets us
+# pre-create a writable output directory without dropping the image's
+# non-root hardening. Linux runners only (same as before — it needs Docker).
 name: "Yubel DAST Orchestrator"
 description: "Run the Yubel multi-target DAST orchestrator in CI."
 branding:
   icon: "shield"
   color: "purple"
+
 inputs:
   target:
     description: "Target URL (for a quick single-target scan)"
@@ -27,21 +39,176 @@ inputs:
   engines:
     description: "Comma-separated allow-list of engines"
     required: false
+  disable:
+    description: "Comma-separated deny-list of engines"
+    required: false
   fail-on:
     description: "Fail the job if a finding is at/above this severity"
     required: false
     default: "high"
+  baseline:
+    description: "Path to a prior yubel.json to diff against"
+    required: false
+  fail-on-new:
+    description: "With `baseline`, gate only on new/regressed findings"
+    required: false
+    default: "false"
+  fast:
+    description: "Quick profile (smoke tests): tighter timeouts, fuzzing-only nuclei"
+    required: false
+    default: "false"
+  offline:
+    description: "Air-gapped hardening: engines make no external calls"
+    required: false
+    default: "false"
   out:
-    description: "Output directory for reports"
+    description: "Output directory for reports (relative to the workspace)"
     required: false
     default: "yubel-report"
+  image:
+    description: "Container image to run"
+    required: false
+    default: "ghcr.io/ggeorgeazevedo/yubel:latest"
+  upload-sarif:
+    description: >-
+      Upload yubel.sarif to GitHub code scanning. Requires the calling job to
+      grant `permissions: security-events: write`. Leave false if you upload
+      the SARIF yourself.
+    required: false
+    default: "false"
+
+outputs:
+  report-dir:
+    description: "Absolute path to the directory holding the reports"
+    value: ${{ steps.scan.outputs.report-dir }}
+  sarif:
+    description: "Path to yubel.sarif (empty when no SARIF was produced)"
+    value: ${{ steps.sarif.outputs.path }}
+  exit-code:
+    description: "yubel exit code: 0 clean, 2 gate failed, other = error"
+    value: ${{ steps.scan.outputs.exit-code }}
+
 runs:
-  using: "docker"
-  image: "docker://ghcr.io/ggeorgeazevedo/yubel:latest"
-  args:
-    - "scan"
-    - ${{ inputs.config && format('-c={0}', inputs.config) || format('-t={0}', inputs.target) }}
-    - ${{ inputs.config && '--quiet' || format('--type={0}', inputs.type) }}
-    - "--fail-on=${{ inputs.fail-on }}"
-    - "-o=${{ inputs.out }}"
-outputs: {}
+  using: composite
+  steps:
+    - name: Run Yubel
+      id: scan
+      shell: bash
+      env:
+        YUBEL_IMAGE: ${{ inputs.image }}
+        IN_TARGET: ${{ inputs.target }}
+        IN_TYPE: ${{ inputs.type }}
+        IN_CONFIG: ${{ inputs.config }}
+        IN_OPENAPI: ${{ inputs.openapi }}
+        IN_ENGINES: ${{ inputs.engines }}
+        IN_DISABLE: ${{ inputs.disable }}
+        IN_FAIL_ON: ${{ inputs.fail-on }}
+        IN_BASELINE: ${{ inputs.baseline }}
+        IN_FAIL_ON_NEW: ${{ inputs.fail-on-new }}
+        IN_FAST: ${{ inputs.fast }}
+        IN_OFFLINE: ${{ inputs.offline }}
+        IN_OUT: ${{ inputs.out }}
+      run: |
+        set -uo pipefail
+
+        if [ -z "${IN_CONFIG}" ] && [ -z "${IN_TARGET}" ]; then
+          echo "::error title=Yubel::provide either 'target' or 'config'."
+          exit 1
+        fi
+
+        case "${IN_OUT}" in
+          /*) out_abs="${IN_OUT}" ;;
+          *)  out_abs="${GITHUB_WORKSPACE}/${IN_OUT}" ;;
+        esac
+
+        # The container is non-root (uid 10001); it cannot mkdir inside a
+        # workspace owned by uid 1001. Create the directory here and mount it
+        # straight onto /out so the reporters always have somewhere to write.
+        mkdir -p "${out_abs}" || exit 1
+        chmod 777 "${out_abs}" || exit 1
+        echo "report-dir=${out_abs}" >> "$GITHUB_OUTPUT"
+
+        args=(scan)
+        if [ -n "${IN_CONFIG}" ]; then
+          args+=(-c "${IN_CONFIG}")
+        else
+          args+=(-t "${IN_TARGET}" --type "${IN_TYPE}")
+        fi
+        [ -n "${IN_OPENAPI}" ]  && args+=(--openapi "${IN_OPENAPI}")
+        [ -n "${IN_FAIL_ON}" ]  && args+=(--fail-on "${IN_FAIL_ON}")
+        [ -n "${IN_BASELINE}" ] && args+=(--baseline "${IN_BASELINE}")
+        [ "${IN_FAIL_ON_NEW}" = "true" ] && args+=(--fail-on-new)
+        [ "${IN_FAST}" = "true" ]        && args+=(--fast)
+        [ "${IN_OFFLINE}" = "true" ]     && args+=(--offline)
+
+        # comma-separated input -> repeated CLI flag
+        add_list() {
+          local flag="$1" raw="$2" item
+          [ -n "${raw}" ] || return 0
+          local IFS=','
+          for item in ${raw}; do
+            item="${item#"${item%%[![:space:]]*}"}"
+            item="${item%"${item##*[![:space:]]}"}"
+            [ -n "${item}" ] && args+=("${flag}" "${item}")
+          done
+        }
+        add_list -e "${IN_ENGINES}"
+        add_list -x "${IN_DISABLE}"
+
+        args+=(-o /out)
+
+        echo "::group::yubel ${args[*]}"
+        docker run --rm \
+          -v "${GITHUB_WORKSPACE}:/github/workspace:ro" \
+          -v "${out_abs}:/out" \
+          -w /github/workspace \
+          "${YUBEL_IMAGE}" "${args[@]}"
+        code=$?
+        echo "::endgroup::"
+
+        echo "exit-code=${code}" >> "$GITHUB_OUTPUT"
+        echo "--- ${out_abs} ---"
+        ls -la "${out_abs}" || true
+
+    # Report the SARIF before honouring the gate, so a failing gate still
+    # publishes its findings instead of swallowing them.
+    - name: Locate SARIF
+      id: sarif
+      if: always()
+      shell: bash
+      env:
+        REPORT_DIR: ${{ steps.scan.outputs.report-dir }}
+      run: |
+        set -uo pipefail
+        if [ -n "${REPORT_DIR:-}" ] && [ -s "${REPORT_DIR}/yubel.sarif" ]; then
+          echo "path=${REPORT_DIR}/yubel.sarif" >> "$GITHUB_OUTPUT"
+          echo "found=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "path=" >> "$GITHUB_OUTPUT"
+          echo "found=false" >> "$GITHUB_OUTPUT"
+          echo "::warning title=No SARIF::yubel.sarif was not produced - nothing to upload."
+        fi
+
+    - name: Upload SARIF to code scanning
+      if: always() && inputs.upload-sarif == 'true' && steps.sarif.outputs.found == 'true'
+      uses: github/codeql-action/upload-sarif@v4.37.3
+      with:
+        sarif_file: ${{ steps.sarif.outputs.path }}
+
+    # Honour `fail-on` last: exit 2 is the severity gate, anything else
+    # non-zero is a real failure of the scanner itself.
+    - name: Apply gate
+      if: always()
+      shell: bash
+      env:
+        CODE: ${{ steps.scan.outputs.exit-code }}
+        IN_FAIL_ON: ${{ inputs.fail-on }}
+      run: |
+        set -uo pipefail
+        case "${CODE:-1}" in
+          0) echo "Scan clean: nothing at or above the gate threshold." ;;
+          2) echo "::error title=Yubel gate::Findings at or above '${IN_FAIL_ON}'."
+             exit 2 ;;
+          *) echo "::error title=Yubel failed::yubel exited with ${CODE:-1} (not a gate failure)."
+             exit 1 ;;
+        esac
