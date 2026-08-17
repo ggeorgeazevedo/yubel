@@ -16,6 +16,7 @@ import time
 from typing import List, Tuple
 
 from ..models import EngineRun, Finding, Target, TargetType
+from ..redact import redact_argv, secrets_of
 from .base import Engine
 
 
@@ -91,8 +92,9 @@ class DalfoxEngine(Engine):
             fs = self.parse(target, workdir, proc.stdout)
             if proc.returncode not in self._ok_returncodes() and not fs:
                 tail = (proc.stderr or proc.stdout or "").strip().splitlines()
-                return [], " ".join(cmd), (tail[-1] if tail else f"exit={proc.returncode}")
-            return fs, " ".join(cmd), ""
+                return [], redact_argv(cmd, secrets_of(target.auth)), (
+                    tail[-1] if tail else f"exit={proc.returncode}")
+            return fs, redact_argv(cmd, secrets_of(target.auth)), ""
         except subprocess.TimeoutExpired:
             return [], "dalfox", f"timeout {self.timeout()}s"
         except FileNotFoundError as e:
