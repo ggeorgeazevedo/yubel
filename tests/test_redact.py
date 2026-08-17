@@ -7,6 +7,7 @@ Yubel injects whatever it is given into the engines (`-H "Authorization: …"`,
 """
 import json
 import os
+import shlex
 
 from yubel.engines.nuclei import NucleiEngine
 from yubel.engines.wapiti import WapitiEngine
@@ -28,7 +29,10 @@ def test_argv_masks_header_values_but_keeps_the_header_name():
     assert TOKEN not in out
     # "this ran authenticated" is worth keeping in a report
     assert "Authorization" in out and MASK in out
-    assert "https://app.example.com" in out
+    # membership in the *parsed* argv, not a substring of the whole line: that
+    # is what shlex.quote is supposed to guarantee, and a substring check
+    # against a URL is the classic incomplete-sanitization pattern
+    assert "https://app.example.com" in shlex.split(out)
 
 
 def test_argv_masks_whole_value_flags():
@@ -91,13 +95,15 @@ def test_no_secret_survives_into_the_serialised_report(tmp_path):
     """The end-to-end property that matters: yubel.json is what CI uploads as
     an artifact and what teams commit as a --baseline."""
     target = _target()
-    for engine in (NucleiEngine(), WapitiEngine()):
-        try:
-            argv = engine.build_command(target, str(tmp_path))
-        except TypeError:                      # nuclei takes a `dast` flag
-            argv = engine.build_command(target, str(tmp_path), False)
+    # each engine is called with its own signature: probing with a
+    # try/except TypeError makes a statically invalid call, and CodeQL is
+    # right to flag it (py/inheritance/incorrect-overriding-signature)
+    for name, argv in (
+        ("nuclei", NucleiEngine().build_command(target, str(tmp_path), False)),
+        ("wapiti", WapitiEngine().build_command(target, str(tmp_path))),
+    ):
         blob = json.dumps({"command": redact_argv(argv, secrets_of(target.auth))})
-        assert TOKEN not in blob, f"{type(engine).__name__} leaked the token"
+        assert TOKEN not in blob, f"{name} leaked the token"
 
 
 def test_secrets_of_collects_every_credential_shape():
