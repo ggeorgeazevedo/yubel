@@ -1,7 +1,11 @@
 name: Release
 on:
   push:
-    tags: ["v*"]
+    # NB: exact semver tags only. The Marketplace-facing floating tag `v0` is
+    # moved on every release, and a bare "v*" filter fired this workflow for it
+    # too — cutting a stray "v0" GitHub Release and re-publishing an already
+    # published version to PyPI.
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
 
 permissions:
   contents: write        # create the GitHub Release

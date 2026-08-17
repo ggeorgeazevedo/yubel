@@ -20,7 +20,20 @@ _URI_PREFIX = "dast"
 _UNSAFE = re.compile(r"[^A-Za-z0-9._-]+")
 
 
-def _artifact_uri(raw: str) -> str:
+def _host_path(raw: str):
+    """Split a scanned target into (host, path, port), tolerating junk."""
+    try:
+        split = urlsplit(raw if "//" in raw else f"//{raw}", scheme="")
+        try:
+            port = split.port     # raises on things like an ARN
+        except ValueError:
+            port = None
+        return split.hostname or "", split.path or "", port
+    except ValueError:
+        return "", "", None
+
+
+def _artifact_uri(raw: str, target: str = "") -> str:
     """Turn a scanned URL/host into a checkout-relative SARIF artifact URI.
 
     GitHub code scanning resolves every `artifactLocation.uri` against the
@@ -32,25 +45,25 @@ def _artifact_uri(raw: str) -> str:
     So we emit a relative pseudo-path — `dast/<host>/<path>` — and keep the
     real URL in the result message and properties, where it stays readable.
     The path is deterministic, so an alert tracks across runs.
+
+    `raw` is often just a path: nikto reports `"url": "/"` for root-level
+    findings and wapiti does the same for module-level ones. Those carry no
+    host, so `target` supplies it — otherwise every such finding would
+    collapse onto one meaningless anchor.
     """
     raw = (raw or "").strip()
-    if not raw:
-        return f"{_URI_PREFIX}/unknown"
+    clean = lambda h: _UNSAFE.sub("-", h).strip("-")
 
-    host, path, port = "", "", None
-    try:                             # never let a weird target break the report
-        split = urlsplit(raw if "//" in raw else f"//{raw}", scheme="")
-        host, path = split.hostname or "", split.path or ""
-        try:
-            port = split.port        # raises on things like an ARN
-        except ValueError:
-            port = None
-    except ValueError:
-        pass
-    if not host:                     # not URL-shaped (k8s host, ARN, free text)
+    host, path, port = _host_path(raw)
+    if not clean(host):              # bare path, or not URL-shaped at all
+        alt, _, alt_port = _host_path((target or "").strip())
+        if clean(alt):
+            path = raw if raw.startswith("/") else (path or raw)
+            host, port = alt, alt_port
+    if not clean(host):              # no usable host anywhere
         host, path, port = raw, "", None
 
-    parts = [_UNSAFE.sub("-", host).strip("-") or "unknown"]
+    parts = [clean(host) or "unknown"]
     if port:
         parts[0] = f"{parts[0]}-{port}"
     for seg in path.split("/"):
@@ -95,7 +108,7 @@ def write_sarif(result: ScanResult, path: str) -> None:
                                 f"{f.description}"[:1000]},
             "locations": [{
                 "physicalLocation": {
-                    "artifactLocation": {"uri": _artifact_uri(where)},
+                    "artifactLocation": {"uri": _artifact_uri(where, f.target)},
                 }
             }],
             # stable across runs, so code scanning tracks an alert instead of

@@ -121,12 +121,32 @@ def test_sarif_uris_are_checkout_relative(tmp_path):
 
     for raw in ["https://demo.example.com/items?id=1", "example.com:8080/admin",
                 "https://[2001:db8::1]:8443/x", "arn:aws:s3:::my-bucket/key",
-                "k8s-control-plane", "/just/a/path", "", "   "]:
+                "k8s-control-plane", "/just/a/path", "", "   ", "/", "-", ":"]:
         uri = _artifact_uri(raw)
         assert uri, f"empty uri for {raw!r}"
         assert not urlparse(uri).scheme, f"{raw!r} -> {uri!r} still has a scheme"
         assert not uri.startswith("/"), f"{raw!r} -> {uri!r} is absolute"
         assert ".." not in uri.split("/"), f"{raw!r} -> {uri!r} escapes the tree"
+
+
+
+def test_sarif_bare_path_anchors_under_the_target():
+    """nikto reports `"url": "/"` for root-level findings, wapiti likewise for
+    module-level ones. A bare path carries no host, so the target has to
+    supply it — otherwise every such finding collapses onto one anchor.
+    """
+    from yubel.reporters.sarif_reporter import _artifact_uri
+
+    t = "https://example.com"
+    assert _artifact_uri("/", t) == "dast/example.com"
+    assert _artifact_uri("/admin", t) == "dast/example.com/admin"
+    assert _artifact_uri("", t) == "dast/example.com"
+    # punctuation-only locations must not swallow the target either
+    assert _artifact_uri("-", t) == "dast/example.com"
+    # an explicit host in the location still wins over the target
+    assert _artifact_uri("https://other.test/x", t) == "dast/other.test/x"
+    # nothing usable anywhere is the only route to the placeholder
+    assert _artifact_uri("/", "") == "dast/unknown"
 
 
 def test_sarif_results_carry_url_and_fingerprint(tmp_path):
