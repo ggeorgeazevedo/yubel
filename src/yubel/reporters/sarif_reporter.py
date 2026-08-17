@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import re
+from urllib.parse import urlsplit
 
 from ..models import ScanResult
 from ..severity import Severity
@@ -11,6 +13,51 @@ _LEVEL = {
     Severity.MEDIUM: "warning", Severity.HIGH: "error",
     Severity.CRITICAL: "error",
 }
+
+# Where DAST findings get anchored in the repo tree. They do not correspond to
+# a source file, so we synthesise a stable pseudo-path under this prefix.
+_URI_PREFIX = "dast"
+_UNSAFE = re.compile(r"[^A-Za-z0-9._-]+")
+
+
+def _artifact_uri(raw: str) -> str:
+    """Turn a scanned URL/host into a checkout-relative SARIF artifact URI.
+
+    GitHub code scanning resolves every `artifactLocation.uri` against the
+    checkout, whose scheme is `file`. An absolute `https://...` URI (or a
+    bare `host:port/...`, where the parser reads the host as the scheme) is
+    rejected outright with "SARIF URI scheme ... did not match the checkout
+    URI scheme file", and the whole upload is dropped.
+
+    So we emit a relative pseudo-path — `dast/<host>/<path>` — and keep the
+    real URL in the result message and properties, where it stays readable.
+    The path is deterministic, so an alert tracks across runs.
+    """
+    raw = (raw or "").strip()
+    if not raw:
+        return f"{_URI_PREFIX}/unknown"
+
+    host, path, port = "", "", None
+    try:                             # never let a weird target break the report
+        split = urlsplit(raw if "//" in raw else f"//{raw}", scheme="")
+        host, path = split.hostname or "", split.path or ""
+        try:
+            port = split.port        # raises on things like an ARN
+        except ValueError:
+            port = None
+    except ValueError:
+        pass
+    if not host:                     # not URL-shaped (k8s host, ARN, free text)
+        host, path, port = raw, "", None
+
+    parts = [_UNSAFE.sub("-", host).strip("-") or "unknown"]
+    if port:
+        parts[0] = f"{parts[0]}-{port}"
+    for seg in path.split("/"):
+        seg = _UNSAFE.sub("-", seg).strip("-")
+        if seg and seg not in (".", ".."):
+            parts.append(seg)
+    return "/".join([_URI_PREFIX, *parts])[:2000]
 
 
 def write_sarif(result: ScanResult, path: str) -> None:
@@ -38,16 +85,24 @@ def write_sarif(result: ScanResult, path: str) -> None:
                     "tags": tags,
                 },
             }
+        where = f.location or f.target
         results.append({
             "ruleId": rule_id,
             "level": _LEVEL.get(f.severity, "warning"),
-            "message": {"text": f"[{f.engine}] {f.title}: {f.description}"[:1000]},
+            # the real URL leads the message: the anchor below is a pseudo-path,
+            # so this is where a reader actually sees what was scanned
+            "message": {"text": f"[{f.engine}] {where} - {f.title}: "
+                                f"{f.description}"[:1000]},
             "locations": [{
                 "physicalLocation": {
-                    "artifactLocation": {"uri": f.location or f.target},
+                    "artifactLocation": {"uri": _artifact_uri(where)},
                 }
             }],
-            "properties": {"engine": f.engine, "confidence": f.confidence,
+            # stable across runs, so code scanning tracks an alert instead of
+            # closing and reopening it every scan
+            "partialFingerprints": {"yubel/v1": f.fingerprint},
+            "properties": {"url": where,
+                           "engine": f.engine, "confidence": f.confidence,
                            "risk_score": f.risk_score, "status": f.status,
                            "verified": f.verified, "corroboration": f.corroboration,
                            "parameter": f.param, "payload": f.payload,
