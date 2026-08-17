@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "yubel"
-version = "0.7.0"
+version = "0.7.1"
 description = "The cloud-native, multi-target DAST orchestrator: one config to run ZAP, Nuclei, Nikto, Wapiti, testssl.sh, sqlmap, dalfox, schemathesis, kube-hunter and more against web, APIs, cloud, containers and Kubernetes."
 readme = "README.md"
 requires-python = ">=3.9"

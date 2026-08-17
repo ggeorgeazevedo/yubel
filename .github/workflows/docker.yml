@@ -2,7 +2,7 @@ name: Docker
 on:
   push:
     branches: [main]
-    tags: ["v*"]
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]   # exact semver only; not the floating v0
   workflow_dispatch:
   # NB: not on pull_request — the full image build (ZAP + Go tools) is heavy and
   # was failing noisily on Dependabot PRs. Build/push happens on main and tags.

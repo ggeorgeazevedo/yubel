@@ -4,6 +4,57 @@ All notable changes to Yubel are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow
 [SemVer](https://semver.org/).
 
+## [0.7.1] — 2026-08-17
+
+CI/CD fixes. The GitHub Actions path was broken end to end: the scan produced
+no reports at all, and on the rare path where it did, code scanning rejected
+the SARIF. Nothing changes for local or container runs.
+
+### Fixed
+- **Reports were never written in CI.** The image runs as the non-root user
+  `yubel` (uid 10001) while the runner workspace is owned by uid 1001 with mode
+  755, so `write_reports()` raised `PermissionError` on `os.makedirs()` and
+  every report — SARIF included — was lost. `dast.yml` now pre-creates a
+  writable output directory and mounts it directly on `/out`.
+- **SARIF upload rejected outright.** `artifactLocation.uri` carried the
+  scanned URL, absolute. GitHub resolves every URI against the checkout (scheme
+  `file`), so an `https://` target — or a bare `host:port/...`, whose host the
+  parser reads as a scheme — killed the whole upload with *"SARIF URI scheme
+  ... did not match the checkout URI scheme file"*. URIs are now
+  checkout-relative pseudo-paths (`dast/<host>/<path>`), with the real URL
+  preserved in `message.text` and `properties.url`.
+- **A missing SARIF no longer fails the job.** `upload-sarif` hard-fails on a
+  nonexistent path; `dast.yml` now checks first and warns instead.
+- **Gate failures were indistinguishable from crashes.** `continue-on-error`
+  masked real scanner errors. Exit code 2 is now treated as the severity gate
+  (warning, reports still published); any other non-zero exit is a real
+  failure and surfaces as such.
+
+### Added
+- **`partialFingerprints`** on every SARIF result, so code scanning tracks an
+  alert across runs instead of closing and reopening it every scan.
+- **`properties.url`** on every SARIF result, and the scanned URL now leads the
+  result message — the location anchor is a pseudo-path, so this is where a
+  reader actually sees what was scanned.
+
+### Changed
+- **Release and Docker workflows only fire on exact semver tags.** Their filter
+  was `v*`, which also matches the floating `v0` tag the Marketplace action
+  points at — moving `v0` would have cut a stray "v0" GitHub Release and tried
+  to re-publish an already published version to PyPI.
+- **`src/yubel.egg-info/` is no longer tracked.** It is build output, already
+  covered by `.gitignore`, but had been committed before that rule existed — so
+  every editable install dirtied the working tree.
+- **The GitHub Action is now a composite action** (was a Docker container
+  action). A container action runs as the image's `USER`, which cannot write
+  into the runner workspace; doing the `docker run` from a composite step lets
+  the action pre-create a writable output directory *and* keep the image
+  non-root. Linux runner with Docker required — as before.
+- **`engines` and `openapi` action inputs now reach the CLI.** They were
+  declared and silently ignored. New inputs: `disable`, `baseline`,
+  `fail-on-new`, `fast`, `offline`, `image`, `upload-sarif` (default `false`).
+  New outputs: `report-dir`, `sarif`, `exit-code`.
+
 ## [0.7.0] — 2026-07-30
 
 Reporting upgrade — **evidence of *where* the issue is, and *how* to fix it** —
@@ -266,6 +317,7 @@ Initial public release.
   **382-tool DAST landscape** (`docs/LANDSCAPE.md` + `data/dast-landscape.csv`).
 - **Tests**: full pipeline coverage without network or external binaries.
 
+[0.7.1]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.7.1
 [0.7.0]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.7.0
 [0.6.0]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.6.0
 [0.5.8]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.5.8
