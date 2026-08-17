@@ -154,11 +154,33 @@ For an **internal cluster pentest**, run the Job in-cluster with `k8s_mode: pod`
     target: https://staging.example.com
     fail-on: high
 - uses: github/codeql-action/upload-sarif@v3
-  if: always()
+  if: always()          # a failing gate must not swallow the findings
   with: { sarif_file: yubel-report/yubel.sarif }
 ```
 
-A ready-made workflow lives in [`.github/workflows/dast.yml`](.github/workflows/dast.yml).
+Or let the action do the upload itself — it skips silently when no SARIF was
+produced, so a scan that never got that far will not turn the job red:
+
+```yaml
+permissions:
+  contents: read
+  security-events: write     # required by upload-sarif
+
+steps:
+  - uses: ggeorgeazevedo/yubel@v0
+    with:
+      target: https://staging.example.com
+      fail-on: high
+      upload-sarif: true
+```
+
+Other inputs: `config`, `type`, `openapi`, `engines`/`disable` (comma-separated),
+`baseline` + `fail-on-new`, `fast`, `offline`, `out`, `image`. Outputs:
+`report-dir`, `sarif`, `exit-code` (`0` clean, `2` gate failed).
+
+The action is a **composite** action and needs a Linux runner with Docker
+(`ubuntu-latest`). A ready-made workflow lives in
+[`.github/workflows/dast.yml`](.github/workflows/dast.yml).
 </details>
 
 ## Baseline / trend scanning
