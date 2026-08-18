@@ -62,14 +62,17 @@ def test_base_does_not_advertise_more_than_it_requires():
             f"Engine.{name} still declares **kwargs")
 
 
-def test_widening_with_optional_parameters_is_allowed():
-    """nuclei and dalfox legitimately take an extra argument from their own
-    `run()`. That is fine precisely because it is optional — the base contract
-    still holds."""
+def test_extra_parameters_live_on_their_own_method():
+    """nuclei needs a `dast` flag and dalfox a `url`, both driven from their
+    own `run()`. Those go on a separate method rather than widening the
+    contract name: a call passing a third argument to `build_command` is what
+    made the base signature disagree with its use in the first place."""
     from yubel.engines.dalfox import DalfoxEngine
     from yubel.engines.nuclei import NucleiEngine
 
-    assert _accepts(NucleiEngine().build_command, 3)   # ... + dast
-    assert _accepts(NucleiEngine().build_command, 2)   # ... and without it
-    assert _accepts(DalfoxEngine().build_command, 3)   # ... + url
-    assert _accepts(DalfoxEngine().build_command, 2)
+    for engine, extra in ((NucleiEngine(), "build_command_for"),
+                          (DalfoxEngine(), "build_command_for")):
+        assert _accepts(getattr(engine, extra), 3)
+        # and the contract name stays exactly two positional arguments
+        assert _accepts(engine.build_command, 2)
+        assert not _accepts(engine.build_command, 3)

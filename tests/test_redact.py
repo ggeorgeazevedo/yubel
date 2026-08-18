@@ -15,24 +15,24 @@ from yubel.models import Auth, Target, TargetType
 from yubel.redact import (MASK, redact_argv, redact_text, secrets_of)
 
 TOKEN = "s3cr3t-production-token-value"
+URL = "https://app.example.com"
 
 
 def _target():
-    return Target(type=TargetType.WEB, url="https://app.example.com",
+    return Target(type=TargetType.WEB, url=URL,
                   auth=Auth(kind="bearer", token=TOKEN))
 
 
 def test_argv_masks_header_values_but_keeps_the_header_name():
-    argv = ["nuclei", "-u", "https://app.example.com",
-            "-H", f"Authorization: Bearer {TOKEN}", "-jsonl"]
+    argv = ["nuclei", "-u", URL, "-H", f"Authorization: Bearer {TOKEN}", "-jsonl"]
     out = redact_argv(argv, [TOKEN])
     assert TOKEN not in out
-    # "this ran authenticated" is worth keeping in a report
-    assert "Authorization" in out and MASK in out
-    # membership in the *parsed* argv, not a substring of the whole line: that
-    # is what shlex.quote is supposed to guarantee, and a substring check
-    # against a URL is the classic incomplete-sanitization pattern
-    assert "https://app.example.com" in shlex.split(out)
+    # Compare the whole parsed argv, element by element. This pins exactly what
+    # changed and what did not — including that the URL survives as ONE
+    # argument, which is the point of shlex.quote — and it avoids asserting a
+    # substring against a URL, which is the shape of an incomplete host check.
+    assert shlex.split(out) == [
+        "nuclei", "-u", URL, "-H", f"Authorization: {MASK}", "-jsonl"]
 
 
 def test_argv_masks_whole_value_flags():
@@ -99,7 +99,7 @@ def test_no_secret_survives_into_the_serialised_report(tmp_path):
     # try/except TypeError makes a statically invalid call, and CodeQL is
     # right to flag it (py/inheritance/incorrect-overriding-signature)
     for name, argv in (
-        ("nuclei", NucleiEngine().build_command(target, str(tmp_path), False)),
+        ("nuclei", NucleiEngine().build_command(target, str(tmp_path))),
         ("wapiti", WapitiEngine().build_command(target, str(tmp_path))),
     ):
         blob = json.dumps({"command": redact_argv(argv, secrets_of(target.auth))})

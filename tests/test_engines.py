@@ -19,8 +19,8 @@ def test_zap_unavailable_reason_is_clear():
 
 def test_nuclei_full_vs_dast_command():
     eng = NucleiEngine()
-    full = eng.build_command(_web(), "/tmp", dast=False)
-    dast = eng.build_command(_web(), "/tmp", dast=True)
+    full = eng.build_command_for(_web(), "/tmp", dast=False)
+    dast = eng.build_command_for(_web(), "/tmp", dast=True)
     assert "-dast" not in full            # full template pass
     assert "-dast" in dast                # fuzzing pass
     assert "nuclei-full.jsonl" in " ".join(full)
@@ -66,7 +66,7 @@ def test_offline_profile_hardens_nuclei():
     cfg = Config(targets=[_web()])
     _apply_offline(cfg)
     assert cfg.options["nuclei"]["offline"] is True
-    cmd = " ".join(NucleiEngine(cfg.options["nuclei"]).build_command(
+    cmd = " ".join(NucleiEngine(cfg.options["nuclei"]).build_command_for(
         _web(), "/tmp", dast=True))
     assert "-ni" in cmd and "-duc" in cmd     # no OAST, no update check
 

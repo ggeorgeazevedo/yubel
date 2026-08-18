@@ -1,0 +1,26 @@
+refactor(engines): o parametro extra sai do nome do contrato
+
+Estreitar a assinatura da base nao bastou - e o CodeQL continuou apontando
+py/inheritance/incorrect-overridden-signature, so que na linha nova. A causa
+nao era a declaracao, era a CHAMADA: nuclei.py fazia
+self.build_command(target, workdir, dast) e dalfox.py
+self.build_command(target, workdir, url), passando 3 argumentos por um nome
+cujo contrato declara 2. Alargar com parametro opcional nao resolve isso,
+porque quem le a classe base continua sem saber que existe um terceiro.
+
+- nuclei: build_command_for(target, workdir, dast) e
+  parse_for(target, workdir, stdout, dast); os nomes do contrato viram
+  wrappers finos que delegam com o default
+- dalfox: build_command_for(target, workdir, url), idem
+- call sites internos e testes existentes passam a usar o metodo proprio
+- test_engine_contract passa a verificar o desenho novo: o nome do contrato
+  aceita exatamente 2 posicionais e recusa 3
+
+Verificado com o CodeQL local (bundle 2.26.3, suite
+python-security-and-quality):
+  main .................. 2 alertas
+  esta branch ........... 1 alerta (so o py/str-format pre-existente em
+                          html_reporter.py:74, que nao tem relacao)
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PjWg8D4Aq11Dqb4eKnKWhk

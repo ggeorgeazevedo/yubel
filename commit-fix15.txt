@@ -1,0 +1,17 @@
+test(redact): compara o argv inteiro em vez de procurar a URL na string
+
+A correcao anterior (substring -> shlex.split) nao resolveu: o CodeQL flagra
+py/incomplete-url-substring-sanitization pela FORMA da comparacao, um literal
+de URL num teste de pertinencia, independente do lado direito ser lista.
+
+Agora a assercao compara o argv parseado inteiro, elemento por elemento, com
+==. Alem de nao ter mais a forma que a regra procura, e uma assercao melhor:
+fixa exatamente o que mudou e o que nao mudou, incluindo que a URL sobrevive
+como UM argumento - que e a promessa do shlex.quote.
+
+Verificado rodando o CodeQL localmente (bundle 2.26.3, suite
+python-security-and-quality): esta branch passa a ter os mesmos 2 alertas
+pre-existentes da main, ou seja, zero alertas novos.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PjWg8D4Aq11Dqb4eKnKWhk
