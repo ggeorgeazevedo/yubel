@@ -4,7 +4,7 @@ All notable changes to Yubel are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow
 [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [0.7.2] — 2026-08-18
 
 ### Security
 - **The operator's own credentials no longer reach the reports.** Yubel injects
@@ -23,6 +23,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow
   intact — blanking those would destroy the finding.
 - `EngineRun.command` is now quoted with `shlex.quote`, so an argument
   containing spaces no longer reads as several arguments.
+
+- **The base engine signature is the contract.** `Engine.build_command` and
+  `Engine.parse` declared `*args, **kwargs`, advertising a wider contract than
+  any of the twelve engines implements. nuclei's `dast` flag and dalfox's `url`
+  now live on their own `build_command_for` / `parse_for`, and
+  `tests/test_engine_contract.py` checks both directions.
 
 ## [0.7.1] — 2026-08-17
 
@@ -341,6 +347,7 @@ Initial public release.
   **382-tool DAST landscape** (`docs/LANDSCAPE.md` + `data/dast-landscape.csv`).
 - **Tests**: full pipeline coverage without network or external binaries.
 
+[0.7.2]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.7.2
 [0.7.1]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.7.1
 [0.7.0]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.7.0
 [0.6.0]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.6.0
