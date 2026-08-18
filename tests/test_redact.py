@@ -99,7 +99,7 @@ def test_no_secret_survives_into_the_serialised_report(tmp_path):
     # try/except TypeError makes a statically invalid call, and CodeQL is
     # right to flag it (py/inheritance/incorrect-overriding-signature)
     for name, argv in (
-        ("nuclei", NucleiEngine().build_command(target, str(tmp_path), False)),
+        ("nuclei", NucleiEngine().build_command(target, str(tmp_path))),
         ("wapiti", WapitiEngine().build_command(target, str(tmp_path))),
     ):
         blob = json.dumps({"command": redact_argv(argv, secrets_of(target.auth))})

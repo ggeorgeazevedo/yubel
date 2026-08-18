@@ -85,7 +85,7 @@ class DalfoxEngine(Engine):
     def _scan_url(self, target: Target, url: str) -> Tuple[List[Finding], str, str]:
         workdir = tempfile.mkdtemp(prefix="yubel-dalfox-")
         try:
-            cmd = self.build_command(target, workdir, url)
+            cmd = self.build_command_for(target, workdir, url)
             proc = subprocess.run(
                 cmd, capture_output=True, text=True, timeout=self.timeout(),
                 cwd=workdir, env={**os.environ, "NO_COLOR": "1"})
@@ -105,8 +105,12 @@ class DalfoxEngine(Engine):
             if not self.options.get("keep_workdir"):
                 shutil.rmtree(workdir, ignore_errors=True)
 
-    def build_command(self, target: Target, workdir: str,
-                      url: str = None) -> List[str]:
+    def build_command(self, target: Target, workdir: str) -> List[str]:
+        """The base contract: the target's own endpoint."""
+        return self.build_command_for(target, workdir)
+
+    def build_command_for(self, target: Target, workdir: str,
+                          url: str = None) -> List[str]:
         url = url or target.endpoint()
         if self._major_version() >= 3:
             # dalfox 3.x: URL is a named argument, JSON goes to stdout

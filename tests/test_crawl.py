@@ -36,14 +36,14 @@ def test_param_urls_only_returns_parameterized():
 # ---- nuclei uses -l over the crawled surface --------------------------------
 
 def test_nuclei_uses_u_without_discovery():
-    cmd = NucleiEngine().build_command(_web(), "/tmp", dast=False)
+    cmd = NucleiEngine().build_command_for(_web(), "/tmp", dast=False)
     assert "-u" in cmd and "-l" not in cmd
 
 
 def test_nuclei_full_pass_lists_whole_surface(tmp_path):
     # the full-template pass scans every crawled URL (params or not)
     t = _web(seed=["http://t.example/p?a=1", "http://t.example/static"])
-    cmd = NucleiEngine().build_command(t, str(tmp_path), dast=False)
+    cmd = NucleiEngine().build_command_for(t, str(tmp_path), dast=False)
     assert "-l" in cmd and "-u" not in cmd
     with open(cmd[cmd.index("-l") + 1]) as fh:
         body = fh.read()
@@ -55,7 +55,7 @@ def test_nuclei_dast_pass_only_fuzzes_param_urls(tmp_path):
     # the expensive dast fuzzing pass targets only parameterized URLs
     t = _web(seed=["http://t.example/p?a=1", "http://t.example/q?b=2",
                    "http://t.example/static"])
-    cmd = NucleiEngine().build_command(t, str(tmp_path), dast=True)
+    cmd = NucleiEngine().build_command_for(t, str(tmp_path), dast=True)
     assert "-l" in cmd
     with open(cmd[cmd.index("-l") + 1]) as fh:
         body = fh.read()
@@ -66,7 +66,7 @@ def test_nuclei_dast_pass_only_fuzzes_param_urls(tmp_path):
 # ---- dalfox scans each discovered parameterized URL -------------------------
 
 def test_dalfox_command_targets_given_url():
-    cmd = DalfoxEngine().build_command(_web(), "/tmp", url="http://t.example/x?id=1")
+    cmd = DalfoxEngine().build_command_for(_web(), "/tmp", url="http://t.example/x?id=1")
     assert "http://t.example/x?id=1" in cmd
     assert "url" in cmd                            # v3/v2 both use the `url` verb
 

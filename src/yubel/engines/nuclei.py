@@ -83,11 +83,11 @@ class NucleiEngine(Engine):
     def _pass(self, target: Target, dast: bool) -> Tuple[List[Finding], str, str]:
         workdir = tempfile.mkdtemp(prefix="yubel-nuclei-")
         try:
-            cmd = self.build_command(target, workdir, dast)
+            cmd = self.build_command_for(target, workdir, dast)
             proc = subprocess.run(
                 cmd, capture_output=True, text=True, timeout=self.timeout(),
                 cwd=workdir, env={**os.environ, "NO_COLOR": "1"})
-            fs = self.parse(target, workdir, proc.stdout, dast)
+            fs = self.parse_for(target, workdir, proc.stdout, dast)
             return fs, redact_argv(cmd, secrets_of(target.auth)), ""
         except subprocess.TimeoutExpired:
             return [], "nuclei", f"timeout {self.timeout()}s"
@@ -99,7 +99,12 @@ class NucleiEngine(Engine):
             if not self.options.get("keep_workdir"):
                 shutil.rmtree(workdir, ignore_errors=True)
 
-    def build_command(self, target: Target, workdir: str, dast: bool = False) -> List[str]:
+    def build_command(self, target: Target, workdir: str) -> List[str]:
+        """The base contract: the full-template pass."""
+        return self.build_command_for(target, workdir, dast=False)
+
+    def build_command_for(self, target: Target, workdir: str,
+                          dast: bool = False) -> List[str]:
         out = os.path.join(workdir, f"nuclei-{'dast' if dast else 'full'}.jsonl")
         cmd = [self.binary]
         # Full-template pass scans the whole crawled surface; the (expensive)
@@ -144,8 +149,12 @@ class NucleiEngine(Engine):
             cmd += list(extra)
         return cmd
 
-    def parse(self, target: Target, workdir: str, stdout: str,
-              dast: bool = False) -> List[Finding]:
+    def parse(self, target: Target, workdir: str, stdout: str) -> List[Finding]:
+        """The base contract: the full-template pass."""
+        return self.parse_for(target, workdir, stdout, dast=False)
+
+    def parse_for(self, target: Target, workdir: str, stdout: str,
+                  dast: bool = False) -> List[Finding]:
         out = os.path.join(workdir, f"nuclei-{'dast' if dast else 'full'}.jsonl")
         text = self._read(out) or stdout
         _sec = secrets_of(target.auth)
