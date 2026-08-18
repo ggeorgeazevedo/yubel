@@ -24,6 +24,7 @@ import time
 from typing import List, Tuple
 
 from ..models import EngineRun, Finding, Target, TargetType
+from ..redact import redact_argv, redact_text, secrets_of
 from .base import Engine
 
 
@@ -87,7 +88,7 @@ class NucleiEngine(Engine):
                 cmd, capture_output=True, text=True, timeout=self.timeout(),
                 cwd=workdir, env={**os.environ, "NO_COLOR": "1"})
             fs = self.parse(target, workdir, proc.stdout, dast)
-            return fs, " ".join(cmd), ""
+            return fs, redact_argv(cmd, secrets_of(target.auth)), ""
         except subprocess.TimeoutExpired:
             return [], "nuclei", f"timeout {self.timeout()}s"
         except FileNotFoundError as e:
@@ -147,6 +148,7 @@ class NucleiEngine(Engine):
               dast: bool = False) -> List[Finding]:
         out = os.path.join(workdir, f"nuclei-{'dast' if dast else 'full'}.jsonl")
         text = self._read(out) or stdout
+        _sec = secrets_of(target.auth)
         findings: List[Finding] = []
         for line in text.splitlines():
             line = line.strip()
@@ -170,8 +172,10 @@ class NucleiEngine(Engine):
                 param=_param_of(ev, matched),
                 payload=(ev.get("extracted-results") or [""])[0]
                     if ev.get("extracted-results") else "",
-                request=_snippet(ev.get("request", ""), 4000),
-                response=_snippet(ev.get("response", ""), 2000),
+                # -irr echoes back the headers we injected: redact before
+                # this reaches yubel.json and the HTML report
+                request=_snippet(ev.get("request", ""), 4000, _sec),
+                response=_snippet(ev.get("response", ""), 2000, _sec),
                 cwe=_first(info.get("classification", {}).get("cwe-id")),
                 cve=_first(info.get("classification", {}).get("cve-id")),
                 references=info.get("reference") or [],
@@ -188,9 +192,9 @@ def _first(v):
     return v or None
 
 
-def _snippet(text: str, limit: int) -> str:
+def _snippet(text: str, limit: int, secrets=()) -> str:
     """Trim raw HTTP request/response to a readable, bounded proof snippet."""
-    text = (text or "").strip()
+    text = redact_text(text or "", secrets).strip()
     if len(text) > limit:
         return text[:limit].rstrip() + "\n…(truncated)"
     return text

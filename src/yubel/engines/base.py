@@ -18,6 +18,7 @@ import time
 from typing import List, Optional, Tuple
 
 from ..models import EngineRun, Finding, Target, TargetType
+from ..redact import redact_argv, secrets_of
 
 
 class Engine:
@@ -83,7 +84,8 @@ class Engine:
         workdir = tempfile.mkdtemp(prefix=f"yubel-{self.name}-")
         try:
             cmd = self.build_command(target, workdir)
-            rec.command = " ".join(cmd)
+            # never let the operator's own credentials into yubel.json
+            rec.command = redact_argv(cmd, secrets_of(target.auth))
             proc = subprocess.run(
                 cmd,
                 capture_output=True,

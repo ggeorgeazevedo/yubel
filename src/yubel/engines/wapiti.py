@@ -6,6 +6,7 @@ import os
 from typing import List
 
 from ..models import Finding, Target, TargetType
+from ..redact import redact_text, secrets_of
 from .base import Engine
 
 # Wapiti category -> CWE hint for nicer normalization
@@ -43,6 +44,7 @@ class WapitiEngine(Engine):
         return cmd
 
     def parse(self, target: Target, workdir: str, stdout: str) -> List[Finding]:
+        _sec = secrets_of(target.auth)
         raw = self._read(os.path.join(workdir, "wapiti.json"))
         if not raw:
             return []
@@ -66,8 +68,10 @@ class WapitiEngine(Engine):
                     cwe=_CWE.get(category),
                     references=list(classifications.get(category, {}).get("ref", {}).values()),
                     remediation=classifications.get(category, {}).get("sol", ""),
-                    raw={"http_request": it.get("http_request", "")[:500],
-                         "curl": it.get("curl_command", "")},
+                    # wapiti stores the full curl line, auth headers included
+                    raw={"http_request": redact_text(
+                             it.get("http_request", "")[:500], _sec),
+                         "curl": redact_text(it.get("curl_command", ""), _sec)},
                 ))
         return findings
 

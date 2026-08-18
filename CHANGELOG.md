@@ -4,6 +4,26 @@ All notable changes to Yubel are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow
 [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+### Security
+- **The operator's own credentials no longer reach the reports.** Yubel injects
+  whatever auth it is given into the engines (`-H "Authorization: Bearer …"`,
+  `--auth-password`, cookies) and two paths carried those values straight to
+  disk: `EngineRun.command` — the exact argv, serialised into `yubel.json`,
+  which is the file CI uploads as an artifact and teams commit as a
+  `--baseline` — and `Finding.request`/`.response`, because nuclei runs with
+  `-irr` and echoes back the headers we sent, rendered verbatim in the HTML
+  report. A new `yubel.redact` module masks credential-bearing header values,
+  whole-value secret flags, credential-looking query parameters, and every
+  literal occurrence of the values it was handed, at the point where each
+  record is built (`engines/base.py`, `nuclei.py`, `dalfox.py`, `wapiti.py`).
+  Header and flag *names* survive, so a report still shows that a scan ran
+  authenticated. Secrets **discovered on the target** are deliberately left
+  intact — blanking those would destroy the finding.
+- `EngineRun.command` is now quoted with `shlex.quote`, so an argument
+  containing spaces no longer reads as several arguments.
+
 ## [0.7.1] — 2026-08-17
 
 CI/CD fixes. The GitHub Actions path was broken end to end: the scan produced
