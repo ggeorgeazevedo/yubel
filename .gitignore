@@ -16,3 +16,4 @@ scan*.json
 .DS_Store
 report/
 _tmp_*
+.claude/
