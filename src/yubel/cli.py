@@ -230,6 +230,35 @@ def _cmd_selftest(out_dir: str) -> int:
     return 0
 
 
+def _build_auth(bearer: Optional[str],
+                headers: Optional[List[str]]) -> Auth:
+    """Combine `--bearer` and `--header` instead of letting one erase the other.
+
+    These used to be two sequential assignments to the same variable, so
+    `--bearer X --header "Y: Z"` silently dropped the token: the whole scan ran
+    unauthenticated and reported the handful of findings an anonymous crawl
+    finds. A false all-clear, which is the worst failure a security tool has.
+
+    A bearer token *is* an Authorization header, so the two compose: the kind
+    stays `bearer` when a token is present (engines that only understand
+    bearer keep working), and the extra headers ride along for the engines
+    that read them.
+    """
+    parsed = {}
+    for item in headers or []:
+        name, sep, value = (item or "").partition(":")
+        if sep and name.strip():
+            parsed[name.strip()] = value.strip()
+
+    if bearer and parsed:
+        return Auth(kind="bearer", token=bearer, headers=parsed)
+    if bearer:
+        return Auth(kind="bearer", token=bearer)
+    if parsed:
+        return Auth(kind="header", headers=parsed)
+    return Auth()
+
+
 def _cmd_scan(args) -> int:
     if not args.quiet:
         print(BANNER)
@@ -240,13 +269,7 @@ def _cmd_scan(args) -> int:
         cfg = Config()
 
     # merge CLI-specified targets
-    auth = Auth()
-    if args.bearer:
-        auth = Auth(kind="bearer", token=args.bearer)
-    if args.header:
-        headers = dict(h.split(":", 1) for h in args.header if ":" in h)
-        auth = Auth(kind="header", headers={k.strip(): v.strip()
-                                            for k, v in headers.items()})
+    auth = _build_auth(args.bearer, args.header)
     for url in args.target:
         cfg.targets.append(Target(type=TargetType(args.type), url=url,
                                   openapi=args.openapi, auth=auth))

@@ -88,7 +88,14 @@ class NucleiEngine(Engine):
                 cmd, capture_output=True, text=True, timeout=self.timeout(),
                 cwd=workdir, env={**os.environ, "NO_COLOR": "1"})
             fs = self.parse_for(target, workdir, proc.stdout, dast)
-            return fs, redact_argv(cmd, secrets_of(target.auth)), ""
+            shown = redact_argv(cmd, secrets_of(target.auth))
+            if proc.returncode not in self._ok_returncodes() and not fs:
+                # same rule as Engine.run(): a hard failure that produced
+                # nothing is an error, not a clean scan. This class overrides
+                # run() and the check was lost in the copy.
+                tail = (proc.stderr or proc.stdout or "").strip().splitlines()
+                return [], shown, (tail[-1] if tail else f"exit={proc.returncode}")
+            return fs, shown, ""
         except subprocess.TimeoutExpired:
             return [], "nuclei", f"timeout {self.timeout()}s"
         except FileNotFoundError as e:
@@ -227,11 +234,13 @@ def _param_of(ev: dict, matched: str) -> str:
 def _auth_headers(target: Target) -> List[str]:
     a = target.auth
     hs = []
-    if a.kind == "bearer" and a.token:
+    if a.token and a.kind == "bearer":
         hs.append(f"Authorization: Bearer {a.token}")
-    if a.kind == "header":
-        for k, v in a.headers.items():
-            hs.append(f"{k}: {v}")
-    if a.kind == "cookie" and a.token:
+    if a.token and a.kind == "cookie":
         hs.append(f"Cookie: {a.token}")
+    # extra headers ride along whatever the kind is: `--bearer X --header "Y: Z"`
+    # now produces a bearer token AND the header, so keying this off `kind`
+    # would silently drop one of the two.
+    for k, v in a.headers.items():
+        hs.append(f"{k}: {v}")
     return hs
