@@ -6,6 +6,7 @@ its native output into a list of `Finding` objects bound to a `Target`.
 from __future__ import annotations
 
 import hashlib
+import re
 import time
 from dataclasses import dataclass, field, asdict
 from enum import Enum
@@ -106,6 +107,35 @@ class Target:
         return urls[:limit] if limit and limit > 0 else urls
 
 
+def canon_cwe(value: Any) -> Optional[str]:
+    """Normalise a CWE id to bare digits, or None.
+
+    Every engine spells this differently: nuclei emits `cwe-79` (its JSON
+    classification carries the prefix), ZAP and dalfox emit `79`, and testssl
+    used to strip `CWE-` by hand at its own call site. The field feeds
+    `Finding.fingerprint`, `analysis.chains` and `correlate._class_key`, so an
+    inconsistent spelling silently splits one issue into two: the same XSS
+    found by nuclei and by ZAP never corroborates, the attack-chain rules go
+    blind to whichever engine spells it the other way, and the systemic
+    correlation counts one class as two.
+
+    Normalising at construction means no adapter, present or future, can
+    reintroduce the split.
+    """
+    if value is None:
+        return None
+    raw = str(value).strip()
+    if not raw:
+        return None
+    # ZAP uses -1 for "no CWE mapped"; some tools use 0
+    if raw.lstrip("+-").isdigit() and int(raw) <= 0:
+        return None
+    match = re.search(r"\d+", raw)          # first id wins in "CWE-1004, CWE-79"
+    if not match:
+        return None
+    return match.group(0).lstrip("0") or None
+
+
 @dataclass
 class Finding:
     """A normalized security finding produced by an engine."""
@@ -148,6 +178,7 @@ class Finding:
 
     def __post_init__(self):
         self.severity = Severity.from_any(self.severity)
+        self.cwe = canon_cwe(self.cwe)
 
     @property
     def fingerprint(self) -> str:

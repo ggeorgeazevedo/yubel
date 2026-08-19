@@ -89,6 +89,32 @@ class Config:
                 errors.append(f"target {t.label} has no url/host")
             if t.type in (TargetType.API,) and not (t.openapi or t.url):
                 errors.append(f"api target {t.label} needs 'openapi' or 'url'")
+        errors += self._unknown_engine_errors()
+        return errors
+
+    def _unknown_engine_errors(self) -> List[str]:
+        """Reject engine names that do not exist, with a suggestion.
+
+        A typo used to be silent and total: `-e nucli` passed validation,
+        matched no engine, ran nothing, wrote empty reports and exited 0. With
+        `--fail-on` the pipeline went green having scanned nothing at all.
+        Same for `disable:` and for the keys of `options:`.
+        """
+        from difflib import get_close_matches
+        from .engines import registry
+
+        known = set(registry())
+        errors = []
+        for field_name, names in (("engines", self.engines),
+                                  ("disable", self.disable),
+                                  ("options", list(self.options))):
+            for name in names or []:
+                if name in known:
+                    continue
+                near = get_close_matches(name, known, n=1)
+                hint = f" (did you mean '{near[0]}'?)" if near else ""
+                errors.append(
+                    f"{field_name}: unknown engine '{name}'{hint}")
         return errors
 
 

@@ -4,6 +4,40 @@ All notable changes to Yubel are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow
 [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+Five paths where the scan reported "no findings", exit 0 and no warning, for a
+scan that had not actually happened. Each one is covered by a test in
+`tests/test_silent_failures.py` that fails on 0.7.2.
+
+- **The CWE id is now canonical.** nuclei emits `cwe-79`, ZAP and dalfox emit
+  `79`, and testssl stripped the prefix by hand at its own call site. The field
+  feeds `Finding.fingerprint`, the attack-chain rules and
+  `correlate._class_key`, so the two spellings split one issue into two: the
+  same XSS found by nuclei and by ZAP never corroborated (so the `verified`
+  tier never fired for it), the chain rules were blind to nuclei, and the
+  systemic correlation counted one class as two. `models.canon_cwe` normalises
+  at construction, so no adapter can reintroduce the split.
+- **`--bearer` together with `--header` no longer discards the token.** They
+  were two sequential assignments to the same variable, so the scan ran
+  unauthenticated and reported the handful of findings an anonymous crawl
+  finds. They now compose, and nuclei sends both.
+- **A misspelled engine name is rejected.** `-e nucli` passed validation,
+  matched no engine, wrote empty reports and exited 0 — with `--fail-on`, a
+  green pipeline that scanned nothing. `Config.validate()` now checks
+  `engines`, `disable` and the keys of `options` against the registry, and
+  suggests the closest match.
+- **nuclei no longer reports `ok` for a run that failed.** `Engine.run()` has
+  the rule ("never report a broken run as ok — false assurance"); nuclei
+  overrides `run()` and the check was lost in the copy. dalfox, which also
+  overrides, had kept it.
+- **testssl no longer accepts its own error codes as success.** It reserves
+  242-255 for hard errors (`declare -r ERR_*`, testssl.sh:75-88); the old
+  `range(0, 250)` swallowed ERR_CONNECT (246), ERR_DNSLOOKUP (247) and
+  ERR_RESOURCE (244), so a testssl that never reached the target reported
+  `ok (0 findings)`.
+
 ## [0.7.2] — 2026-08-18
 
 ### Security

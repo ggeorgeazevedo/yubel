@@ -109,5 +109,14 @@ class TestSSLEngine(Engine):
             ))
         return findings
 
+    #: testssl.sh reserves 242-255 for hard errors and uses everything below
+    #: for normal outcomes (0 = all ok, plus the severity level of the worst
+    #: finding). Source: `declare -r ERR_*` at testssl.sh:75-88 — ERR_CHILD is
+    #: the lowest at 242. The previous `range(0, 250)` swallowed ERR_CONNECT
+    #: (246), ERR_DNSLOOKUP (247) and ERR_RESOURCE (244): a testssl that never
+    #: reached the target, or could not read its own data files, reported
+    #: `ok (0 findings)` — a clean bill of health for a scan that never ran.
+    _ERR_FLOOR = 242
+
     def _ok_returncodes(self):
-        return tuple(range(0, 250))  # testssl uses many exit codes
+        return tuple(range(0, self._ERR_FLOOR))
