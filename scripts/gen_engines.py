@@ -240,7 +240,10 @@ def render() -> str:
         *AUTH_SECTION.splitlines(),
         "",
     ]
-    return "\n".join(lines) + "\n"
+    # exactly one trailing newline: the section builders above each append a
+    # blank separator, and the last one would otherwise leave a blank line at
+    # EOF — which `git apply` reports as a whitespace error on every patch
+    return "\n".join(lines).rstrip("\n") + "\n"
 
 
 def main() -> int:

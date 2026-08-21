@@ -153,4 +153,3 @@ along with any of them — `--bearer X --header "Y: Z"` sends both. Every engine
 (`Engine.auth_headers`), so a new adapter gets them by declaring `header_flag`.
 
 `form` and `oauth2` appear in the `Auth` dataclass but no engine implements them.
-
