@@ -130,10 +130,8 @@ def test_build_auth_table(bearer, headers, kind, token, hdrs):
 
 def test_nuclei_sends_both_the_token_and_the_extra_headers():
     """Keying header emission off `auth.kind` dropped one of the two."""
-    from yubel.engines.nuclei import _auth_headers
-
-    sent = _auth_headers(_web(auth=Auth(kind="bearer", token="T",
-                                        headers={"X-Tenant": "acme"})))
+    sent = NucleiEngine().auth_headers(
+        _web(auth=Auth(kind="bearer", token="T", headers={"X-Tenant": "acme"})))
     assert "Authorization: Bearer T" in sent
     assert "X-Tenant: acme" in sent
 
@@ -227,3 +225,26 @@ def test_testssl_rejects_its_own_error_codes(code, name):
     ERR_RESOURCE, so a testssl that never reached the target reported
     `ok (0 findings)`."""
     assert code not in _TestSSL()._ok_returncodes(), name
+
+
+# --------------------------------------------------------------------------
+# 6. A target type no engine covers scanned nothing and exited 0
+# --------------------------------------------------------------------------
+
+def test_uncovered_target_type_is_rejected():
+    """`--type grpc` is accepted by the CLI (the choices come from the enum),
+    matches no engine, and writes an empty report with exit 0."""
+    errors = Config(targets=[Target(type=TargetType.GRPC,
+                                    url="https://x")]).validate()
+    assert errors and "no engine supports" in errors[0]
+
+
+def test_disabling_every_engine_for_a_target_is_rejected():
+    """Same failure, reached through configuration rather than target type."""
+    everything = [c.name for c in ALL_ENGINES]
+    errors = Config(targets=[_web()], disable=everything).validate()
+    assert errors and "no engine supports" in errors[0]
+
+
+def test_a_covered_target_still_validates():
+    assert Config(targets=[_web()]).validate() == []

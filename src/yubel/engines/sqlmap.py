@@ -16,6 +16,7 @@ class SqlmapEngine(Engine):
     category = "SQL injection (confirm/exploit)"
     supports = (TargetType.WEB, TargetType.API)
     binary = "sqlmap"
+    header_flag = "-H"
     default_timeout = 1200
     homepage = "https://sqlmap.org/"
     #: opt-in only — intrusive
@@ -27,8 +28,7 @@ class SqlmapEngine(Engine):
                "--level", str(self.options.get("level", 1)),
                "--risk", str(self.options.get("risk", 1)),
                "--output-dir", workdir]
-        if target.auth.kind == "bearer" and target.auth.token:
-            cmd += ["-H", f"Authorization: Bearer {target.auth.token}"]
+        cmd += self.auth_args(target)
         if self.options.get("data"):
             cmd += ["--data", self.options["data"]]
         return cmd

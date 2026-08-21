@@ -10,6 +10,7 @@ Adapters must never raise on a scanning error: they capture it in EngineRun.
 """
 from __future__ import annotations
 
+import base64
 import os
 import shutil
 import subprocess
@@ -52,6 +53,50 @@ class Engine:
         """Human message when the engine can't run. Subclasses override for
         clarity (e.g. ZAP resolves scripts, not a single binary)."""
         return f"binary '{self.binary}' not found on PATH"
+
+    #: The flag this engine's binary uses to add an HTTP request header, or
+    #: None when it has no such flag (or none we have verified). Declaring it
+    #: is what makes `auth_args()` work — and leaving it None is what makes the
+    #: gap show up as "no" in `yubel engines`, instead of the scan silently
+    #: running unauthenticated.
+    header_flag: Optional[str] = None
+
+    def auth_headers(self, target: Target) -> List[str]:
+        """Every `Name: value` header implied by the target's credentials.
+
+        One implementation for all engines. It used to live in nuclei.py and
+        handle only what nuclei happened to need, so `--header` reached one of
+        thirteen engines and `basic` reached one other — while the README sold
+        authenticated crawling. Same failure shape as `--offline`: a control
+        that is accepted, documented, and quietly ignored.
+        """
+        auth = target.auth
+        headers: List[str] = []
+        if auth.kind == "bearer" and auth.token:
+            headers.append(f"Authorization: Bearer {auth.token}")
+        elif auth.kind == "cookie" and auth.token:
+            headers.append(f"Cookie: {auth.token}")
+        elif auth.kind == "basic" and auth.username:
+            raw = f"{auth.username}:{auth.password or ''}".encode()
+            headers.append("Authorization: Basic "
+                           + base64.b64encode(raw).decode())
+        # extra headers ride along regardless of kind, so `--bearer X
+        # --header "Y: Z"` sends both rather than one erasing the other
+        headers += [f"{k}: {v}" for k, v in (auth.headers or {}).items()]
+        return headers
+
+    def auth_args(self, target: Target) -> List[str]:
+        """argv fragments carrying the credentials, or [] if unsupported."""
+        if not self.header_flag:
+            return []
+        args: List[str] = []
+        for header in self.auth_headers(target):
+            args += [self.header_flag, header]
+        return args
+
+    def supports_auth(self) -> bool:
+        """Whether credentials reach this engine at all (for `yubel engines`)."""
+        return bool(self.header_flag)
 
     # ---- command construction (implemented by subclasses) --------------
     # This is the contract every engine must honour, and `run()` below calls

@@ -14,6 +14,7 @@ class SchemathesisEngine(Engine):
     category = "API property-based fuzzing"
     supports = (TargetType.API, TargetType.GRAPHQL)
     binary = "schemathesis"
+    header_flag = "-H"
     default_timeout = 1200
     homepage = "https://github.com/schemathesis/schemathesis"
 
@@ -35,8 +36,7 @@ class SchemathesisEngine(Engine):
         base = self.options.get("base_url") or (target.url if target.openapi else None)
         if base:
             cmd += ["--base-url", base]
-        if target.auth.kind == "bearer" and target.auth.token:
-            cmd += ["-H", f"Authorization: Bearer {target.auth.token}"]
+        cmd += self.auth_args(target)
         return cmd
 
     def parse(self, target: Target, workdir: str, stdout: str) -> List[Finding]:

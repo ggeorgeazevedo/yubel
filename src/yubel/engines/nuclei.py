@@ -34,6 +34,7 @@ class NucleiEngine(Engine):
     supports = (TargetType.WEB, TargetType.API, TargetType.CLOUD,
                 TargetType.KUBERNETES, TargetType.CONTAINER, TargetType.HOST)
     binary = "nuclei"
+    header_flag = "-H"
     default_timeout = 900
     homepage = "https://github.com/projectdiscovery/nuclei"
 
@@ -51,13 +52,7 @@ class NucleiEngine(Engine):
             rec.finished_at = time.time()
             return [], rec
 
-        passes = []
-        if self.options.get("full", True):
-            passes.append(False)   # full template set
-        if self.options.get("dast", True):
-            passes.append(True)    # parameter fuzzing
-        if not passes:
-            passes = [False]
+        passes = self.passes()
 
         findings: List[Finding] = []
         cmds: List[str] = []
@@ -106,6 +101,24 @@ class NucleiEngine(Engine):
             if not self.options.get("keep_workdir"):
                 shutil.rmtree(workdir, ignore_errors=True)
 
+    def passes(self) -> List[bool]:
+        """Which nuclei invocations this configuration asks for.
+
+        `False` is the full-template pass, `True` the parameter-fuzzing (dast)
+        pass. Disabling both would mean running nothing at all and reporting a
+        clean scan, so that case falls back to the full pass.
+
+        This is a method rather than inline logic because it is exactly what
+        `--fast` and the `full`/`dast` options control, and a test that
+        reimplements the rule locally only ever tests its own copy.
+        """
+        selected = []
+        if self.options.get("full", True):
+            selected.append(False)
+        if self.options.get("dast", True):
+            selected.append(True)
+        return selected or [False]
+
     def build_command(self, target: Target, workdir: str) -> List[str]:
         """The base contract: the full-template pass."""
         return self.build_command_for(target, workdir, dast=False)
@@ -144,8 +157,7 @@ class NucleiEngine(Engine):
             cmd += ["-ni", "-duc"]
         if self.options.get("rate_limit"):
             cmd += ["-rl", str(self.options["rate_limit"])]
-        for h in _auth_headers(target):
-            cmd += ["-H", h]
+        cmd += self.auth_args(target)
         extra = self.options.get("extra_args")
         if extra:
             # accept either a list or a shell-style string (avoid list("...")
@@ -229,18 +241,3 @@ def _param_of(ev: dict, matched: str) -> str:
         if qs:
             return next(iter(qs))
     return ""
-
-
-def _auth_headers(target: Target) -> List[str]:
-    a = target.auth
-    hs = []
-    if a.token and a.kind == "bearer":
-        hs.append(f"Authorization: Bearer {a.token}")
-    if a.token and a.kind == "cookie":
-        hs.append(f"Cookie: {a.token}")
-    # extra headers ride along whatever the kind is: `--bearer X --header "Y: Z"`
-    # now produces a bearer token AND the header, so keying this off `kind`
-    # would silently drop one of the two.
-    for k, v in a.headers.items():
-        hs.append(f"{k}: {v}")
-    return hs
