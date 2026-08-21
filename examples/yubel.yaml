@@ -6,12 +6,22 @@ parallelism: 4
 include_opt_in: false        # set true to allow intrusive engines (e.g. sqlmap)
 fail_on: high                # CI gate: exit non-zero if a finding >= high
 
+# --- analysis layer (Yubel's differentiators) ---
+chains: true                 # synthesize multi-step attack chains
+cluster_threshold: 8         # collapse >=N similar info/low findings into one
+offline: false               # air-gapped: engines make no external calls (no OAST/updates)
+# baseline: baseline.json    # diff against a prior yubel.json (new/fixed/regressed)
+# fail_on_new: true          # with baseline, gate only on NEW/regressed findings
+
 # Per-engine options (all optional; sensible defaults otherwise)
 options:
   nuclei:
+    full: true               # run the complete template set (CVEs, exposures, misconfig)
+    dast: true               # also run parameter fuzzing (needs URL params)
     severity: "low,medium,high,critical"
-    dast: true               # enable parameter fuzzing templates
     rate_limit: 150
+  nikto:
+    maxtime: 600             # cap Nikto runtime (seconds) so it can't stall a scan
   zap:
     mode: full               # full | baseline
     ajax: true               # spider single-page apps

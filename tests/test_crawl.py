@@ -3,6 +3,8 @@
 No network or external binaries: we exercise URL selection, command building and
 the orchestrator's discovery→scan seeding directly.
 """
+import pytest
+
 from yubel.config import Config
 from yubel.models import Finding, ScanResult, Target, TargetType
 from yubel.orchestrator import Orchestrator, DISCOVERY_ENGINES
@@ -83,17 +85,36 @@ def test_discovery_seeds_target_urls_capped():
     assert cfg.targets[0].seed_urls == ["http://t/a?x=1", "http://t/b"]  # capped to 2
 
 
-def test_discovery_seeding_respects_crawl_off():
-    # crawl disabled → the orchestrator never seeds, even if katana ran
-    cfg = Config(targets=[_web("http://t")], crawl=False)
-    res = ScanResult()
-    res.add([Finding("Attack surface", "info", "katana", "http://t",
-                     raw={"endpoints": ["http://t/a?x=1"]})])
-    # run() only calls _seed_from_discovery when config.crawl is True; here we
-    # assert the target stays unseeded by simulating that guard.
-    if cfg.crawl:
-        Orchestrator(cfg)._seed_from_discovery(res)
-    assert cfg.targets[0].seed_urls == []
+@pytest.mark.parametrize("crawl,expected", [
+    (False, []),
+    (True, ["http://t/a?x=1"]),
+])
+def test_run_honours_the_crawl_guard(monkeypatch, crawl, expected):
+    """Drive the real guard in Orchestrator.run(), both ways.
+
+    The previous version wrote `if cfg.crawl: ...` in the test body and
+    asserted on the result — simulating the branch instead of running it. With
+    `crawl=False` the body never executed, so the assert held by construction
+    and deleting the guard from run() would not have failed anything.
+    """
+    cfg = Config(targets=[_web("http://t")], crawl=crawl)
+    orch = Orchestrator(cfg)
+
+    discovered = Finding("Attack surface", "info", "katana", "http://t",
+                         raw={"endpoints": ["http://t/a?x=1"]})
+
+    def fake_batch(pairs, result, cancelled):
+        # stand in for the discovery batch: katana "ran" and found an endpoint
+        if any(e.name == "katana" for e, _ in pairs):
+            result.add([discovered])
+
+    monkeypatch.setattr(Orchestrator, "_run_batch", staticmethod(fake_batch))
+    monkeypatch.setattr(
+        Orchestrator, "_plan",
+        lambda self: [(KatanaEngine(), cfg.targets[0])])
+
+    orch.run()
+    assert cfg.targets[0].seed_urls == expected
 
 
 def test_discovery_engines_constant():

@@ -28,20 +28,17 @@ def test_nuclei_full_vs_dast_command():
 
 
 def test_nuclei_pass_selection_from_options():
-    # default: both passes; fast: dast only; full-only when dast disabled
-    assert _passes({}) == [False, True]
-    assert _passes({"full": False, "dast": True}) == [True]
-    assert _passes({"full": True, "dast": False}) == [False]
-    assert _passes({"full": False, "dast": False}) == [False]  # never empty
+    """Exercise NucleiEngine.passes() itself.
 
-
-def _passes(opts):
-    p = []
-    if opts.get("full", True):
-        p.append(False)
-    if opts.get("dast", True):
-        p.append(True)
-    return p or [False]
+    This used to call a `_passes()` helper defined in this file that
+    reimplemented the rule — so it tested its own copy, and deleting the real
+    logic from nuclei.py left it green.
+    """
+    assert NucleiEngine({}).passes() == [False, True]
+    assert NucleiEngine({"full": False, "dast": True}).passes() == [True]
+    assert NucleiEngine({"full": True, "dast": False}).passes() == [False]
+    # disabling both would scan nothing and report clean: fall back to full
+    assert NucleiEngine({"full": False, "dast": False}).passes() == [False]
 
 
 def test_nikto_has_maxtime_cap():

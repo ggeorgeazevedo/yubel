@@ -74,14 +74,12 @@ Yubel is the **conductor, not another instrument** — it can even orchestrate a
 ```bash
 pip install yubel     # core (orchestrator + reporters + analysis)
 
-yubel setup                # detect & install the scanning engines (one command)
-yubel setup --install      # actually install the missing ones (brew/pip)
-yubel engines              # see what's registered and available here
+yubel setup                # show what's missing and how to install it
+yubel setup --install      # actually install what it can (brew/pip/go)
+yubel engines              # what's registered, available, and carries auth
 yubel selftest             # synthetic run — validates the pipeline, no network
 yubel scan -t https://example.com --fail-on high -o report/
 ```
-
-Don't want to install anything? The Docker image below bundles every engine.
 
 Prefer everything bundled? The Docker image ships the orchestrator **and** the engines:
 
@@ -91,16 +89,27 @@ docker run --rm -v "$PWD/out:/out" ghcr.io/ggeorgeazevedo/yubel:latest \
 open out/yubel.html
 ```
 
+On Linux without Homebrew, `yubel setup --install` cannot fetch `nikto`,
+`testssl` or `zap` — use the Docker image, or install those three by hand.
+Per-engine options, timeouts and the authentication matrix live in
+[`docs/engines.md`](docs/engines.md).
+
 ## Targets it understands
 
 | Type | Example | Engines routed to it |
 |---|---|---|
 | `web` | app, portal, dashboard, SPA | zap, nuclei, wapiti, nikto, dalfox, testssl, katana, httpx |
-| `api` | REST + OpenAPI/Swagger | zap (api-scan), nuclei, schemathesis, wapiti, testssl |
-| `graphql` | GraphQL endpoint | graphw00f, graphql-cop, zap, schemathesis |
+| `api` | REST + OpenAPI/Swagger | zap (api-scan), nuclei, schemathesis, wapiti, dalfox, testssl, katana, httpx |
+| `graphql` | GraphQL endpoint | graphw00f, graphql-cop, zap, schemathesis, testssl |
 | `cloud` | external/attack-surface asset | httpx, katana, nuclei, testssl |
 | `kubernetes` | cluster (remote/internal/pod) | kube-hunter, nuclei (via ingress) |
 | `container` / `host` | exposed service | httpx, nuclei, nikto, testssl |
+
+`sqlmap` is intrusive and runs only when named explicitly (`-e sqlmap`) or with
+`--include-intrusive`. `grpc` exists in the target enum but no engine covers it
+yet — a config that targets it now fails validation instead of writing an empty
+report. Which engines carry your credentials is a separate question: run
+`yubel engines` and read the `AUTH` column.
 
 ## A real config
 

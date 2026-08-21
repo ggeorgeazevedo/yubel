@@ -37,6 +37,60 @@ scan that had not actually happened. Each one is covered by a test in
   `range(0, 250)` swallowed ERR_CONNECT (246), ERR_DNSLOOKUP (247) and
   ERR_RESOURCE (244), so a testssl that never reached the target reported
   `ok (0 findings)`.
+- **Credentials now reach every engine that can carry them.** `--header` was
+  honoured by one adapter of thirteen, `cookie` by one other and `basic` by a
+  third: each adapter re-implemented `if auth.kind == "bearer"` and stopped
+  there, so three of the four kinds were dropped by five of the six engines
+  that take credentials at all. An engine that silently scans anonymously
+  finds a fraction of what it should and reports it as a clean run.
+  `Engine.auth_headers()` / `auth_args()` on the base now build all four kinds
+  once, and an adapter opts in by declaring `header_flag` — nuclei, wapiti,
+  sqlmap, dalfox, schemathesis and graphql-cop do. wapiti keeps driving basic
+  auth natively, which is better than sending the header ourselves.
+- **A target type no engine covers is rejected.** `--type grpc` was accepted by
+  the CLI (the choices come from the enum), matched no engine, and wrote an
+  empty report with exit 0. `Config.validate()` now rejects any target nothing
+  can scan — which also catches the same hole reached through configuration,
+  e.g. every engine disabled.
+
+### Added
+- **`docs/engines.md`**, generated from the registry by `scripts/gen_engines.py`.
+  Eleven of the twenty-four `options` keys in use were documented nowhere a
+  user would read — including `timeout`, which applies to every engine, and
+  `keep_workdir`, the only way to inspect a failed engine's raw output. The
+  doc carries the engine table, target routing, per-engine options, top-level
+  config keys and the authentication matrix. `tests/test_engines_doc.py` fails
+  the build if the committed file drifts from the code, or if an engine reads
+  an option that has no description.
+- **`yubel engines` gained an `AUTH` column** and names, underneath the table,
+  the engines that scan anonymously. The auth gap is now stated rather than
+  left as an absence.
+- `NucleiEngine.passes()` is a documented public method — it was inline logic
+  inside `run()` that no test could reach.
+
+### Changed
+- `deploy/helm/omnidast` → `deploy/helm/yubel`, and `examples/omnidast.yaml` →
+  `examples/yubel.yaml` (regenerated from `templates.STARTER_CONFIG`, so the
+  example and the `yubel init` output cannot disagree). The old project name
+  no longer appears in the tree.
+- README: the `api` and `graphql` rows of the target table listed engines that
+  do not run and omitted ones that do; `yubel setup`'s comment described the
+  `--install` behaviour; a duplicate line claimed the Docker image twice. Added
+  the Linux-without-Homebrew caveat, the sqlmap opt-in rule and the `grpc` gap.
+
+### Fixed (tests)
+Four tests passed without exercising the code they named. Each was verified by
+sabotage — breaking the production path and confirming the test now fails.
+- `test_crawl.py` asserted on a hand-rolled copy of the crawl guard; it now
+  drives the real guard through `_run_batch`/`_plan`.
+- `test_engines.py` re-implemented nuclei's pass selection instead of calling
+  `NucleiEngine().passes()`.
+- `test_analysis.py` lost its `or` to operator precedence: `a and "IDOR" in t or
+  "object authorization" in t` made the second half independent of `is_chain`.
+- `test_core.py` used `"http-equiv" not in html` to mean "self-contained
+  report", which nothing in the report ever emits — so that half asserted
+  nothing, and adding a CSP `<meta>` would have failed the test guarding
+  self-containment. It now checks external `src`, `href` and `@import` directly.
 
 ## [0.7.2] — 2026-08-18
 

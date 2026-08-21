@@ -247,7 +247,7 @@ def test_new_chain_rules():
     from yubel.analysis import chains
     chains.synthesize(r)
     chains.synthesize(r2)
-    assert any(f.is_chain and "IDOR" in f.title or "object authorization" in f.title
+    assert any(f.is_chain and ("IDOR" in f.title or "object authorization" in f.title)
                for f in r.findings)
     assert any(f.is_chain and "full compromise" in f.title for f in r2.findings)
 
