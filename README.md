@@ -10,7 +10,7 @@
 
 **A cloud-native, multi-target DAST orchestrator with a correlation brain.**
 
-Yubel runs the best open-source dynamic security engines — ZAP, Nuclei, Nikto, Wapiti, testssl.sh, sqlmap, dalfox, katana, schemathesis, graphql-cop, kube-hunter — against **web apps, REST/GraphQL APIs, cloud assets, containers and Kubernetes**, then does what no single scanner can: it **correlates** their output into corroborated findings and **synthesizes multi-step attack chains**. Runs installed (`pip`), in Docker, as a Kubernetes Job/CronJob, or in CI.
+Yubel runs the best open-source dynamic security engines — ZAP, Nuclei, Nikto, Wapiti, testssl.sh, sqlmap, dalfox, katana, httpx, schemathesis, graphw00f, graphql-cop, kube-hunter — against **web apps, REST/GraphQL APIs, cloud assets, containers and Kubernetes**, then does what no single scanner can: it **correlates** their output into corroborated findings and **synthesizes multi-step attack chains**. Runs installed (`pip`), in Docker, as a Kubernetes Job/CronJob, or in CI.
 
 [![CI](https://github.com/ggeorgeazevedo/yubel/actions/workflows/ci.yml/badge.svg)](https://github.com/ggeorgeazevedo/yubel/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/ggeorgeazevedo/yubel/actions/workflows/codeql.yml/badge.svg)](https://github.com/ggeorgeazevedo/yubel/actions/workflows/codeql.yml)
@@ -29,13 +29,13 @@ Yubel runs the best open-source dynamic security engines — ZAP, Nuclei, Nikto,
 ---
 
 > ### 🛡️ Air-gapped by design
-> Yubel needs **no LLM and no cloud** to work. Its core makes **zero outbound calls** — it only ever talks to the targets you point it at — so results never leave your perimeter. Add `--offline` to also stop the underlying engines from reaching external services (no OAST/interactsh, no update checks). Runs fully inside regulated, isolated and on-prem networks where AI-driven tools simply can't go. **Deterministic, reproducible, auditable** — the same scan yields the same result, every time.
+> Yubel needs **no LLM and no cloud** to work. Its core makes **zero outbound calls** — it only ever talks to the targets you point it at — so results never leave your perimeter. Add `--offline` to harden the engines further — today that disables nuclei's OAST/interactsh callbacks and its template update check; the other engines are not covered yet, so treat it as defence in depth, not a guarantee. Runs fully inside regulated, isolated and on-prem networks where AI-driven tools simply can't go. **Deterministic, reproducible, auditable** — the same scan yields the same result, every time.
 
 ---
 
 ## Why Yubel
 
-No single scanner is best at everything. ZAP excels at deep authenticated web crawls; Nuclei is unbeatable for templated checks and fast fuzzing; testssl.sh owns TLS; kube-hunter is the way to dynamically pentest a cluster; schemathesis tears apart OpenAPI contracts. Real programs already run several of these — badly glued together with bespoke scripts, incompatible reports and no shared severity model.
+No single scanner is best at everything. ZAP excels at deep web crawls (Yubel does not pass credentials to it yet — see the AUTH column in [`docs/engines.md`](docs/engines.md)); Nuclei is unbeatable for templated checks and fast fuzzing; testssl.sh owns TLS; kube-hunter is the way to dynamically pentest a cluster; schemathesis tears apart OpenAPI contracts. Real programs already run several of these — badly glued together with bespoke scripts, incompatible reports and no shared severity model.
 
 **Yubel is the glue, done properly:**
 
@@ -212,28 +212,39 @@ yubel scan -c yubel.yaml --baseline baseline.json \
 ## Pipeline
 
 ```
-target ─▶ registry.select_for(target) ─▶ [engines for this type, minus deny-list,
+target ─▶ DISCOVERY ── katana / httpx crawl the target first
+                    └─ up to crawl_max_urls (150) discovered URLs are seeded
+                       into the parameter scanners  [--no-crawl to skip]
+        ─▶ registry.select_for(target) ─▶ [engines for this type, minus deny-list,
                                            minus intrusive/opt-in]
         ─▶ ThreadPool (bounded by parallelism)
         ─▶ each engine: build_command → run in temp workdir → parse → [Finding]
         ─▶ collect ─▶ dedupe (merge cross-engine dups, keep worst severity)
         ─▶ ANALYSIS ── taxonomy (OWASP/CWE/MITRE) + risk score
                     ├─ consensus (corroboration → confidence uplift)
+                    ├─ cross-target correlation (same flaw on N targets = 1 fix)
                     ├─ cluster noise (info/low repetition → 1 finding)
                     ├─ attack-chain synthesis (composite findings)
+                    ├─ remediation KB (deterministic fix per finding)
+                    ├─ confirmed / needs-review tier
                     └─ baseline diff (new / existing / regressed / fixed)
         ─▶ reporters (json/html/md/sarif) ─▶ fail-gate exit code
 ```
+
+**Discovery is where coverage is decided.** `crawl_max_urls` defaults to 150 and
+the cap is logged, never a silent truncation. `--no-crawl` turns the phase off;
+`--crawl-headless` runs katana with a headless browser for JS-heavy SPAs.
 
 Intrusive engines (currently **sqlmap**) are **off by default** and only run when you pass `--include-intrusive` or name them explicitly with `-e sqlmap`.
 
 ## Adding an engine
 
-1. Subclass `Engine` in `src/yubel/engines/`, declaring `name`, `supports`, `binary`.
+1. Subclass `Engine` in `src/yubel/engines/`, declaring `name`, `supports`, `binary` — and `header_flag` with the tool's add-a-header flag. **Without `header_flag` the engine never receives credentials** and will scan anonymously while reporting a normal result.
 2. Implement `build_command()` and `parse()` (return normalized `Finding`s).
 3. Register it in `engines/registry.py`.
+4. Run `python3 scripts/gen_engines.py` and commit `docs/engines.md`. If your adapter reads a new `options` key, add a description for it in that script — CI fails on an undocumented option.
 
-That's it — availability probing, target routing, CLI listing, parallelism and reporting all come for free. See `engines/nuclei.py` for a compact reference and [CONTRIBUTING.md](CONTRIBUTING.md).
+Availability probing, target routing, CLI listing, parallelism, auth and reporting then come for free. See `engines/nuclei.py` for a compact reference and [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Releasing (how the badges go green)
 
@@ -244,7 +255,7 @@ The badges light up automatically once the repo is on GitHub:
 - **Release / PyPI / Docker** — populate when you cut a release:
 
 ```bash
-git tag v0.3.0 && git push origin v0.3.0
+git tag vX.Y.Z && git push origin vX.Y.Z
 ```
 
 That tag triggers `release.yml` (builds the wheel, publishes to **PyPI** via

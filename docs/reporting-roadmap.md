@@ -37,16 +37,22 @@ como corrigir**, e onde a OpenAI/LLM entra sem quebrar o DNA determinístico/air
 
 O modelo `Finding` da Yubel **já tem os campos certos**: `location`, `evidence`,
 `remediation`, `cwe/cve`, `owasp/owasp_api/mitre`, `risk_score`, `confidence`,
-`corroboration`, `rationale`. O problema **não é o schema — é o preenchimento**:
-hoje muitos findings saem com `evidence`/`remediation` vazios (ex.: testssl,
-nikto). O trabalho é **encher esses campos com prova e correção**, e **mostrar
-isso bem no relatório**.
+`corroboration`, `rationale`. O problema **não era o schema — era o
+preenchimento**. Desde a 0.7.0 o `remediation` sai preenchido em **todo**
+finding (KB determinística por CWE → categoria OWASP → genérico seguro), e o
+bloco de prova (param/payload/request/response) sai preenchido no **nuclei** e
+no **dalfox**. O que ainda falta é prova nos outros engines — zap, wapiti,
+nikto, schemathesis, testssl.
 
 ---
 
 ## 3. Plano priorizado (foco: onde + como corrigir)
 
 ### P1 — Prova por finding (request/response + localização exata)  ⭐ maior valor
+**Parcialmente entregue na 0.7.0**: nuclei (roda com `-irr`) e dalfox já
+preenchem `param`/`payload`/`request`/`response`, e o HTML renderiza o bloco de
+prova. Falta estender aos demais engines — zap, wapiti, nikto, schemathesis.
+
 Adaptação **determinística** do proof-based da Invicti (sem exploit destrutivo):
 - Capturar e guardar, por finding, o **par request/response** que disparou a
   detecção — o nuclei já dá `matched-at`, `matcher-name`, `extracted-results`;
@@ -57,18 +63,16 @@ Adaptação **determinística** do proof-based da Invicti (sem exploit destrutiv
 - No HTML: bloco de evidência **copiável/colapsável** (request destacado,
   trecho da resposta que prova, curl de reprodução).
 
-### P2 — Base de conhecimento de remediação (fix acionável)  ⭐
-- Uma KB determinística **indexada por CWE / categoria OWASP / template-id** que
-  preenche `remediation` com passos concretos (não só links) — o modelo do ASTF
-  ("recommendation" por test case).
-- Cada finding passa a sair com: **como reproduzir** (o request) + **como
-  corrigir** (da KB) + referências.
+### ~~P2 — Base de conhecimento de remediação~~ — **entregue na 0.7.0**
+`analysis/remediation.py`: KB determinística indexada por CWE → categoria OWASP
+→ genérico seguro, aplicada a todo finding em `analyze()`. Remediação vinda do
+próprio engine sempre ganha. Sem rede, sem modelo.
 
-### P3 — Tier "Confirmado vs Precisa revisão" (a resposta determinística ao proof-based)
-- Regra determinística: finding **corroborado por 2+ engines** OU com **payload
-  refletido/evidência concreta** = **Confirmed**; o resto = **Reported**.
-- Relatório separa as duas listas. É o "proof" da Invicti sem LLM e sem exploit
-  destrutivo — auditável.
+### ~~P3 — Tier "Confirmado vs Precisa revisão"~~ — **entregue na 0.7.0**
+`analysis/__init__._verified`: corroborado por 2+ engines, sintetizado como
+chain, payload com prova observável, ou observação direta de transporte =
+**Confirmed**; o resto, **Needs review**. HTML e Markdown mostram o badge;
+o SARIF expõe `verified`.
 
 ### P4 — Re-teste de correção (`--retest`)
 - Reaproveita o baseline diff que já existe (new/existing/regressed/fixed):

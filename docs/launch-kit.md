@@ -31,7 +31,7 @@ Ela não reinventa scanner nenhum. Ela **orquestra os melhores engines open-sour
 🌐 **Correlação sistêmica entre alvos** — a mesma falha em N serviços vira 1 recomendação "corrija na origem"
 🧾 **Rastro de evidência determinístico** — cada finding carrega um "por que acreditamos nisso" auditável
 
-E o diferencial que mais me importava: **enquanto o mercado corre pra colocar LLM pra "validar" vulnerabilidade, a Yubel vai na direção oposta.** Sem LLM. Sem cloud. Zero chamadas externas — seus resultados nunca saem do perímetro. Modo `--offline` de primeira classe pra rede air-gapped/on-prem, onde ferramenta com IA não entra. Mesma varredura, mesmo resultado, sempre.
+E o diferencial que mais me importava: **enquanto o mercado corre pra colocar LLM pra "validar" vulnerabilidade, a Yubel vai na direção oposta.** Sem LLM. Sem cloud. Zero chamadas externas — seus resultados nunca saem do perímetro. Um switch `--offline` que ainda endurece o nuclei por cima disso (sem OAST, sem update de template), pra rede air-gapped/on-prem onde ferramenta com IA não entra. Mesma varredura, mesmo resultado, sempre.
 
 Está tudo aberto e distribuído em três canais:
 📦 `pip install yubel` · 🐳 `ghcr.io/ggeorgeazevedo/yubel` · 🧩 GitHub Marketplace
@@ -68,7 +68,7 @@ Then it does what no single scanner can:
 **4/**
 The deliberate choice: while everyone's bolting LLMs onto DAST to "validate" findings, Yubel goes the other way.
 
-No LLM. No cloud. Zero outbound calls. First-class `--offline` for air-gapped/regulated networks. Same scan → same result, every time.
+No LLM. No cloud. Zero outbound calls from the core. An `--offline` switch hardens nuclei further. Same scan → same result, every time.
 
 **5/**
 Open-source (Apache-2.0), three ways to run:
@@ -100,7 +100,7 @@ Yubel orchestrates best-of-breed OSS engines (ZAP, Nuclei, Nikto, testssl.sh, da
 - **Systemic correlation across targets** — the same weakness on N services becomes one "fix centrally" finding
 - **Deterministic evidence trail** — every finding carries a reproducible "why we believe this" (engines, corroboration, OWASP/CWE/MITRE, risk score)
 
-Deliberate design choice: instead of adding an LLM to "validate" findings, the core makes **zero outbound calls** and has a first-class `--offline` mode for air-gapped / regulated / on-prem environments. Same scan, same result, every time — which matters for audit reproducibility.
+Deliberate design choice: instead of adding an LLM to "validate" findings, the core makes **zero outbound calls**, with an `--offline` switch that hardens nuclei on top, for air-gapped / regulated / on-prem environments. Same scan, same result, every time — which matters for audit reproducibility.
 
 Apache-2.0. Runs via `pip`, Docker (GHCR) or as a GitHub Action.
 
@@ -120,7 +120,7 @@ Hi HN. I built Yubel because every DAST scanner gives you a pile of findings and
 
 Yubel wraps best-of-breed OSS engines (ZAP, Nuclei, Nikto, testssl.sh, dalfox, sqlmap, schemathesis, kube-hunter) across web, APIs, cloud, containers and Kubernetes, normalizes their output, and then correlates: cross-engine consensus, attack-chain synthesis (e.g. SSRF + metadata endpoint → instance takeover), systemic correlation across targets, and a deterministic "why we believe this" evidence trail.
 
-The design bet is the opposite of the current trend: no LLM, no cloud, zero outbound calls, first-class `--offline` mode — so results are reproducible and it runs in air-gapped/regulated networks.
+The design bet is the opposite of the current trend: no LLM, no cloud, zero outbound calls from the core, plus an `--offline` switch that hardens nuclei — so results are reproducible and it runs in air-gapped/regulated networks.
 
 Apache-2.0. `pip install yubel`, Docker image on GHCR, or a GitHub Action.
 https://github.com/ggeorgeazevedo/yubel
