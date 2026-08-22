@@ -46,6 +46,10 @@ class GraphqlCopEngine(Engine):
     supports = (TargetType.GRAPHQL,)
     binary = "graphql-cop"
     header_flag = "-H"
+    # graphql-cop parses -H with json.loads() and, on failure, prints a line
+    # and carries on scanning — so a colon-style header does not fail the run,
+    # it just silently drops the credentials.
+    header_style = "json"
     default_timeout = 300
     homepage = "https://github.com/dolevf/graphql-cop"
 
