@@ -90,6 +90,29 @@ class Config:
             if t.type in (TargetType.API,) and not (t.openapi or t.url):
                 errors.append(f"api target {t.label} needs 'openapi' or 'url'")
         errors += self._unknown_engine_errors()
+        errors += self._uncovered_target_errors()
+        return errors
+
+    def _uncovered_target_errors(self) -> List[str]:
+        """Reject a target type that no engine can scan.
+
+        `--type grpc` is accepted by the CLI (the choices come from the enum),
+        matches no engine, and produces an empty report with exit 0 — a clean
+        bill of health for a scan that never ran. This is generic on purpose:
+        any target left uncovered by the enabled/disabled sets is caught, not
+        just grpc.
+        """
+        from .engines import select_for
+
+        errors = []
+        for target in self.targets:
+            engines = select_for(target, self.engines, self.disable,
+                                 self.options, include_opt_in=self.include_opt_in)
+            if not engines:
+                errors.append(
+                    f"target {target.label} ({target.type.value}): no engine "
+                    f"supports this target type with the current "
+                    f"engines/disable settings")
         return errors
 
     def _unknown_engine_errors(self) -> List[str]:

@@ -45,6 +45,7 @@ class GraphqlCopEngine(Engine):
     category = "GraphQL security audit"
     supports = (TargetType.GRAPHQL,)
     binary = "graphql-cop"
+    header_flag = "-H"
     default_timeout = 300
     homepage = "https://github.com/dolevf/graphql-cop"
 
@@ -53,8 +54,7 @@ class GraphqlCopEngine(Engine):
 
     def build_command(self, target: Target, workdir: str) -> List[str]:
         cmd = [self.binary, "-t", target.endpoint(), "-o", "json"]
-        if target.auth.kind == "bearer" and target.auth.token:
-            cmd += ["-H", f"Authorization: Bearer {target.auth.token}"]
+        cmd += self.auth_args(target)
         return cmd
 
     def parse(self, target: Target, workdir: str, stdout: str) -> List[Finding]:

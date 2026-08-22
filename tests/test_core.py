@@ -78,8 +78,13 @@ def test_selftest_pipeline_and_reports(tmp_path):
     # HTML is self-contained (no external scripts)
     with open(os.path.join(tmp_path, "yubel.html")) as fh:
         html = fh.read()
-    assert "<script>" in html and "http-equiv" not in html
+    # self-contained: the script is inline and nothing is fetched over the
+    # network. `http-equiv` used to stand in for this, which meant adding a
+    # CSP <meta> to the report would have failed the test that guards it.
+    assert "<script>" in html
     assert "src=\"http" not in html
+    assert "href=\"http" not in html.replace('href="https://owasp.org', "")
+    assert "@import" not in html
 
 
 def test_gate_threshold():

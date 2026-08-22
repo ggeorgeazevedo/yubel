@@ -25,6 +25,7 @@ class DalfoxEngine(Engine):
     category = "XSS"
     supports = (TargetType.WEB, TargetType.API)
     binary = "dalfox"
+    header_flag = "-H"
     default_timeout = 900
     homepage = "https://github.com/hahwul/dalfox"
 
@@ -115,13 +116,12 @@ class DalfoxEngine(Engine):
         if self._major_version() >= 3:
             # dalfox 3.x: URL is a named argument, JSON goes to stdout
             cmd = [self.binary, "url", "--url", url, "--format", "json", "--silence"]
-            if target.auth.kind == "bearer" and target.auth.token:
-                cmd += ["--header", f"Authorization: Bearer {target.auth.token}"]
+            for header in self.auth_headers(target):
+                cmd += ["--header", header]     # 3.x spells it long-form
         else:
             # dalfox 2.x: positional URL
             cmd = [self.binary, "url", url, "--format", "json", "--silence"]
-            if target.auth.kind == "bearer" and target.auth.token:
-                cmd += ["-H", f"Authorization: Bearer {target.auth.token}"]
+            cmd += self.auth_args(target)
         return cmd
 
     def parse(self, target: Target, workdir: str, stdout: str) -> List[Finding]:

@@ -24,6 +24,7 @@ class WapitiEngine(Engine):
     category = "web DAST (per-vuln modules)"
     supports = (TargetType.WEB, TargetType.API)
     binary = "wapiti"
+    header_flag = "-H"
     default_timeout = 1500
     homepage = "https://wapiti-scanner.github.io/"
 
@@ -35,12 +36,16 @@ class WapitiEngine(Engine):
         depth = self.options.get("depth")
         if depth:
             cmd += ["-d", str(depth)]
-        a = target.auth
-        if a.kind == "basic" and a.username:
-            cmd += ["--auth-method", "basic", "--auth-user", a.username,
-                    "--auth-password", a.password or ""]
-        if a.kind == "bearer" and a.token:
-            cmd += ["-H", f"Authorization: Bearer {a.token}"]
+        auth = target.auth
+        if auth.kind == "basic" and auth.username:
+            # wapiti drives basic auth natively (it manages the session), which
+            # is better than sending the header ourselves
+            cmd += ["--auth-method", "basic", "--auth-user", auth.username,
+                    "--auth-password", auth.password or ""]
+            cmd += [arg for h in (auth.headers or {}).items()
+                    for arg in ("-H", f"{h[0]}: {h[1]}")]
+        else:
+            cmd += self.auth_args(target)
         return cmd
 
     def parse(self, target: Target, workdir: str, stdout: str) -> List[Finding]:

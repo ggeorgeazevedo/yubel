@@ -139,18 +139,28 @@ def main(argv: Optional[List[str]] = None) -> int:
 
 def _cmd_engines() -> int:
     print(BANNER)
-    print(f"{'ENGINE':<16}{'AVAILABLE':<11}{'TARGETS':<34}CATEGORY")
-    print("-" * 96)
+    print(f"{'ENGINE':<16}{'AVAILABLE':<11}{'AUTH':<6}{'TARGETS':<34}CATEGORY")
+    print("-" * 102)
+    no_auth = []
     for cls in ALL_ENGINES:
         if cls.name == "demo":
             continue
         eng = cls()
         avail = "yes" if eng.available() else "no"
+        # whether credentials actually reach this engine — a scan that runs
+        # unauthenticated finds a fraction of what an authenticated one does,
+        # and it used to be invisible which engines were in that boat
+        auth = "yes" if eng.supports_auth() else "no"
+        if not eng.supports_auth():
+            no_auth.append(cls.name)
         tgts = ",".join(t.value for t in cls.supports)
         opt = "  (intrusive/opt-in)" if cls.name in OPT_IN else ""
-        print(f"{cls.name:<16}{avail:<11}{tgts:<34}{cls.category}{opt}")
-    print("\nMissing engines are simply skipped at runtime. Install them locally "
-          "or use the Yubel Docker image, which bundles them all.")
+        print(f"{cls.name:<16}{avail:<11}{auth:<6}{tgts:<34}{cls.category}{opt}")
+    print("\nMissing engines are simply skipped at runtime — install them "
+          "locally or use the Yubel Docker image.")
+    if no_auth:
+        print(f"AUTH=no means credentials are NOT passed to that engine, so it "
+              f"scans anonymously: {', '.join(no_auth)}.")
     return 0
 
 
