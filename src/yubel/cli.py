@@ -95,7 +95,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     ps.add_argument("-q", "--quiet", action="store_true")
 
     # engines ------------------------------------------------------------
-    sub.add_parser("engines", help="list engines and availability")
+    pe = sub.add_parser("engines", help="list engines and availability")
+    pe.add_argument("--check", action="store_true",
+                    help="exit 1 if any non-opt-in engine is missing "
+                         "(for verifying an image or an install)")
     # setup --------------------------------------------------------------
     pu = sub.add_parser("setup", help="install the scanning engines (one command)")
     pu.add_argument("--install", action="store_true",
@@ -121,7 +124,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(__version__)
             return 0
         if args.cmd == "engines":
-            return _cmd_engines()
+            return _cmd_engines(check=args.check)
         if args.cmd == "setup":
             return _cmd_setup(args)
         if args.cmd == "init":
@@ -137,7 +140,16 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 130
 
 
-def _cmd_engines() -> int:
+def _cmd_engines(check: bool = False) -> int:
+    """List the engines — and, with --check, refuse to stay quiet about gaps.
+
+    `--check` exists because of a real incident: the published container image
+    advertised thirteen engines and shipped eleven. The ZAP download 404'd on a
+    pinned filename under a `latest/` path, `curl` without `-f` exits 0 on an
+    HTTP error, and a trailing `|| true` swallowed what was left — so the build
+    went green with no ZAP. Nothing ever asked the image what it actually had.
+    Now the build asks, and fails if the answer is wrong.
+    """
     print(BANNER)
     print(f"{'ENGINE':<16}{'AVAILABLE':<11}{'AUTH':<6}{'TARGETS':<34}CATEGORY")
     print("-" * 102)
@@ -161,6 +173,18 @@ def _cmd_engines() -> int:
     if no_auth:
         print(f"AUTH=no means credentials are NOT passed to that engine, so it "
               f"scans anonymously: {', '.join(no_auth)}.")
+
+    if check:
+        # opt-in engines are excluded on purpose: sqlmap is intrusive and an
+        # image is allowed to ship without it.
+        missing = sorted(cls.name for cls in ALL_ENGINES
+                         if cls.name != "demo" and cls.name not in OPT_IN
+                         and not cls().available())
+        if missing:
+            print(f"\n✗ {len(missing)} engine(s) missing: "
+                  f"{', '.join(missing)}", file=sys.stderr)
+            return 1
+        print("\n✓ every non-opt-in engine is present")
     return 0
 
 

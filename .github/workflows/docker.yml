@@ -3,9 +3,20 @@ on:
   push:
     branches: [main]
     tags: ["v[0-9]+.[0-9]+.[0-9]+"]   # exact semver only; not the floating v0
+  pull_request:
+    # Path-scoped rather than off entirely. The full build is heavy and used to
+    # fail noisily on Dependabot PRs, so this workflow was excluded from PRs —
+    # which also meant the image was pushed to ghcr.io with nothing ever having
+    # verified it. It went out advertising thirteen engines with eleven in it.
+    # Scoping to the files that can break the image keeps the noise away and
+    # still proves every change that touches it.
+    paths:
+      - "Dockerfile"
+      - ".dockerignore"
+      - ".github/workflows/docker.yml"
+      - "pyproject.toml"
+      - "src/**"
   workflow_dispatch:
-  # NB: not on pull_request — the full image build (ZAP + Go tools) is heavy and
-  # was failing noisily on Dependabot PRs. Build/push happens on main and tags.
 
 permissions:
   contents: read
@@ -16,6 +27,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+
+      - name: Set up QEMU            # arm64 emulation for the multi-arch build
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v4
@@ -40,16 +54,38 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build (and push on main/tags)
+      # Single-arch first, loaded into the local daemon, so the smoke test runs
+      # against a real image. A multi-platform build cannot be `--load`ed, so
+      # this has to come before the push build rather than instead of it; the
+      # amd64 half of the push build is then a cache hit.
+      - name: Build amd64 for verification
         uses: docker/build-push-action@v7
         with:
           context: .
-          push: ${{ github.event_name == 'push' }}
+          platforms: linux/amd64
+          load: true
+          tags: yubel:verify
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify the image ships every engine it claims
+        run: docker run --rm yubel:verify engines --check
+
+      - name: Verify the pipeline runs end to end
+        run: |
+          mkdir -p "${GITHUB_WORKSPACE}/smoke" && chmod 777 "${GITHUB_WORKSPACE}/smoke"
+          docker run --rm -v "${GITHUB_WORKSPACE}/smoke:/out" yubel:verify \
+            selftest -o /out
+          test -s "${GITHUB_WORKSPACE}/smoke/yubel.sarif"
+
+      - name: Build multi-arch and push (main/tags)
+        if: github.event_name == 'push'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      - name: Smoke test the image (PRs)
-        if: github.event_name == 'pull_request'
-        run: docker build -t yubel:ci . && docker run --rm yubel:ci selftest -o /tmp/out

@@ -6,7 +6,65 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow
 
 ## [Unreleased]
 
+### Fixed — the published container image shipped 11 of the 13 engines it advertised
+Running the image and asking it showed `zap: no` and `graphql-cop: no`. Nothing
+in the build or the release pipeline had ever asked, so it went out that way.
+Both causes are the failure shape this project keeps finding: a scan that
+reports normally without having run.
+
+- **ZAP was fetched from a URL that could only ever break.** The build asked
+  GitHub for `releases/latest/download/ZAP_2.16.1_Linux.tar.gz` — a pinned
+  *filename* under a floating `latest/` path — so it 404'd the day upstream cut
+  2.17.0. Pinning half a URL is worse than pinning none of it, because it looks
+  pinned. Two things then hid the failure: `curl -sSL` has no `-f`, so curl
+  exits **0** on a 404 and writes the error page to the output file; and the
+  whole `&&` chain ended in `|| true`, which swallows a failure of *any*
+  command in it, not just the last. Both verified locally against a 404 before
+  changing anything.
+- **`pip install graphql-cop` installs a placeholder.** The PyPI project of
+  that name is version 0.0.1 and its own summary reads "Reserved name
+  placeholder. No functionality." It installs cleanly and provides no binary.
+  The real tool is `github.com/dolevf/graphql-cop`, now cloned at a pinned tag.
+  Its `requirements.txt` pins `requests==2.25.1`, which would drag schemathesis
+  down with it, so its dependencies are installed unpinned instead.
+- **Every version in the image is now an ARG** — Go tools, ZAP, nikto,
+  testssl.sh, graphql-cop, and both base images — so a bump is a visible,
+  reviewable change instead of whatever upstream published that morning. Every
+  `RUN` starts with `set -eux` and every download uses `curl -f`.
+- **The build now asks the image what it shipped.** New `yubel engines --check`
+  exits non-zero if any non-opt-in engine is missing; the Dockerfile runs it as
+  a build step, so this class of gap fails the build. Intrusive opt-in engines
+  (`sqlmap`) are deliberately exempt.
+- **The Docker workflow's smoke test never ran.** It was guarded by
+  `if: github.event_name == 'pull_request'` in a workflow that does not trigger
+  on `pull_request` — so the image was pushed to ghcr.io with nothing verifying
+  it. The workflow now builds on PRs that touch the image (path-scoped, so
+  Dependabot noise stays away), loads a single-arch image, and runs both
+  `engines --check` and a full `selftest` against it before any push.
+- **The image is now `linux/amd64` *and* `linux/arm64`.** It was amd64-only, so
+  Apple Silicon needed `--platform linux/amd64` and ran under emulation. The Go
+  stage builds on the host architecture and cross-compiles via `GOARCH`, so the
+  second architecture costs minutes rather than most of an hour.
+
+### Fixed — credentials silently dropped for graphql-cop
+Introduced by the previous release's own auth work, and the same shape it was
+written to eliminate. graphql-cop was given `header_flag = "-H"` and nothing
+else, so it received `Authorization: Bearer …`. It parses `-H` with
+`json.loads()` and wants `{"Authorization": "Bearer …"}`; its handler for a
+value it cannot parse is a bare `except:` that prints one line and **keeps
+scanning**. So the run did not fail — it dropped the credentials and reported
+an anonymous scan as a normal one.
+
+Adapters now declare `header_style` (`colon` or `json`) alongside `header_flag`,
+and a test asserts the spelling for every auth-capable engine. The other five
+were checked against their own `--help`: nuclei, wapiti, sqlmap, dalfox and
+schemathesis all take `Name: value`.
+
 ### Changed
+- `docs/engines.md` now derives the top-level config defaults from `Config`
+  itself. The hand-written table claimed `crawl_max_urls: 50` while the code
+  said 150 — the exact drift the generator exists to prevent — and described
+  `offline` as covering every engine.
 - **The brand is one file now, and it stays out of the severity scale's way.**
   Yubel's identity lived as literal hex strings in six hand-edited SVGs, a
   diagram script, the HTML report and `action.yml`, and they had already
@@ -39,6 +97,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow
   reproducible and can be refreshed at every release.
 - `action.yml` branding colour is now `red` (GitHub only renders a fixed set of
   words, so the palette collapses to one).
+
+- `deploy/helm/omnidast` → `deploy/helm/yubel`, and `examples/omnidast.yaml` →
+  `examples/yubel.yaml` (regenerated from `templates.STARTER_CONFIG`, so the
+  example and the `yubel init` output cannot disagree). The old project name
+  no longer appears in the tree.
+- README: the `api` and `graphql` rows of the target table listed engines that
+  do not run and omitted ones that do; `yubel setup`'s comment described the
+  `--install` behaviour; a duplicate line claimed the Docker image twice. Added
+  the Linux-without-Homebrew caveat, the sqlmap opt-in rule and the `grpc` gap.
 
 ### Fixed — documentation that overstated what the tool does
 An audit of every doc against the source turned up statements that would
@@ -144,16 +211,6 @@ scan that had not actually happened. Each one is covered by a test in
   left as an absence.
 - `NucleiEngine.passes()` is a documented public method — it was inline logic
   inside `run()` that no test could reach.
-
-### Changed
-- `deploy/helm/omnidast` → `deploy/helm/yubel`, and `examples/omnidast.yaml` →
-  `examples/yubel.yaml` (regenerated from `templates.STARTER_CONFIG`, so the
-  example and the `yubel init` output cannot disagree). The old project name
-  no longer appears in the tree.
-- README: the `api` and `graphql` rows of the target table listed engines that
-  do not run and omitted ones that do; `yubel setup`'s comment described the
-  `--install` behaviour; a duplicate line claimed the Docker image twice. Added
-  the Linux-without-Homebrew caveat, the sqlmap opt-in rule and the `grpc` gap.
 
 ### Fixed (tests)
 Four tests passed without exercising the code they named. Each was verified by
