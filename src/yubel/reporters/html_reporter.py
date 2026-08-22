@@ -299,21 +299,29 @@ _TEMPLATE = """<!doctype html>
 <style>
 :root{{
   --ink:#16191d; --body:#2b3038; --muted:#6a7280; --line:#e2e5ea;
-  --bg:#ffffff; --panel:#fbfcfd; --accent:#3f3d8c; --accent-soft:#ecebf6;
+  --bg:#ffffff; --panel:#fbfcfd; --accent:#343a42; --accent-soft:#f1f3f5;
+  /* The frame is deliberately neutral. Brand crimson and brand gold appear
+     in exactly one place in this document — the mark in the masthead —
+     because every other hue here already means a severity, and a reader
+     should never have to work out whether a colour is a finding or a
+     decoration. See scripts/brand.py. */
+  --brand-gold:#c9a227; --brand-gold-dim:#8a6a1f; --brand-crimson:#a3121c;
   --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
   --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   --mono:"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;
 }}
 @media(prefers-color-scheme:dark){{
   :root{{--ink:#eef1f4;--body:#c4cad2;--muted:#8b93a0;--line:#2a2f37;
-    --bg:#101317;--panel:#161a1f;--accent:#a7a3e6;--accent-soft:#20222e;}}
+    --bg:#101317;--panel:#161a1f;--accent:#c8ced6;--accent-soft:#1b1f24;}}
 }}
 *{{box-sizing:border-box}}
 html{{-webkit-text-size-adjust:100%}}
 body{{margin:0;background:var(--bg);color:var(--body);
   font:16px/1.6 var(--sans);}}
 .wrap{{max-width:960px;margin:0 auto;padding:0 28px 80px}}
-a{{color:var(--accent)}}
+/* underlined, because the accent is now a neutral graphite: a link must not
+   depend on hue alone to be recognisable as one */
+a{{color:var(--accent);text-decoration:underline;text-underline-offset:2px}}
 h1,h2,h3{{font-family:var(--serif);color:var(--ink);font-weight:600;letter-spacing:-.01em}}
 small{{font-family:var(--sans);font-weight:600;font-size:.55em;color:var(--muted);
   text-transform:uppercase;letter-spacing:.08em;margin-left:.6em;vertical-align:middle}}
@@ -453,16 +461,10 @@ footer{{color:var(--muted);font-size:12px;padding:26px 0 0;line-height:1.6}}
 <div class="mast">
   <div class="brand">
     <svg class="eye" viewBox="0 0 100 100" aria-hidden="true">
-      <path d="M50 6 L90 50 L50 94 L10 50 Z" fill="none" stroke="var(--accent)" stroke-width="2.4" opacity="0.85"/>
-      <g stroke="var(--accent)" stroke-width="2" fill="none">
-        <path d="M26 42 Q34 34 42 42 Q34 50 26 42 Z"/>
-        <path d="M58 42 Q66 34 74 42 Q66 50 58 42 Z"/>
-        <path d="M34 64 Q50 52 66 64 Q50 76 34 64 Z"/>
-      </g>
-      <circle cx="34" cy="42" r="3.4" fill="var(--accent)"/>
-      <circle cx="66" cy="42" r="3.4" fill="var(--accent)"/>
-      <circle cx="50" cy="64" r="5" fill="var(--accent)"/>
-      <circle cx="50" cy="64" r="2" fill="var(--bg)"/>
+      <circle cx="50" cy="50" r="30" fill="none" stroke="var(--brand-crimson)" stroke-width="2.4"/>
+      <path d="M50 4 L56 44 L87 50 L56 56 L50 96 L44 56 L13 50 L44 44 Z" fill="var(--brand-gold)"/>
+      <path d="M50 4 L44 44 L13 50 L44 56 L50 96 Z" fill="var(--brand-gold-dim)"/>
+      <path d="M50 36 L55 50 L50 64 L45 50 Z" fill="var(--brand-crimson)"/>
     </svg>
     <div><h1>Yubel</h1><div class="sub">Security Assessment</div></div>
   </div>

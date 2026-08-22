@@ -29,6 +29,10 @@ An engine adapter is a small, self-contained wrapper around one OSS tool.
        supports = (TargetType.WEB, TargetType.API)
        binary = "mytool"                 # looked up on PATH
        homepage = "https://…"
+       header_flag = "-H"                # the tool's add-a-header flag
+       # Without header_flag, credentials NEVER reach this engine: it will
+       # scan anonymously, find a fraction of what it should, and report
+       # that as a normal result. `yubel engines` shows it as AUTH=no.
 
        def build_command(self, target, workdir):
            out = f"{workdir}/mytool.json"
@@ -45,6 +49,11 @@ An engine adapter is a small, self-contained wrapper around one OSS tool.
 
 3. **Test** it. Add a parse-only unit test with a captured sample of the tool's
    output — no network needed. See `tests/` for patterns.
+
+4. **Regenerate the reference**: `python3 scripts/gen_engines.py`, and commit
+   `docs/engines.md`. If your adapter reads a new `self.options.get("…")` key,
+   add a description for it in that script's `DESCRIPTIONS` — CI fails on an
+   undocumented option, and on a stale doc.
 
 ### Adapter rules
 

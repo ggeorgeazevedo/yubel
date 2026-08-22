@@ -145,6 +145,11 @@ A target type with no engine is a config error, not an empty report.
 | `output.formats` | json, html, markdown | Reporters to run (`md` is an alias for `markdown`). |
 | `output.sarif` | true | Also emit `yubel.sarif`. |
 
+Two per-target keys are parsed and then **ignored**: `scope` and `exclude` are read into
+`Target.scope` / `Target.exclude`, and no engine consults them — so a config that sets
+them is not scoped in any way. They are accepted rather than rejected only because
+rejecting would break existing files; treat them as not implemented.
+
 ## Authentication
 
 `Auth.kind` is one of `bearer`, `cookie`, `header` or `basic`, and extra headers ride

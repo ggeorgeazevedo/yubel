@@ -20,14 +20,14 @@ name: "Yubel DAST Orchestrator"
 description: "Run the Yubel multi-target DAST orchestrator in CI."
 branding:
   icon: "shield"
-  color: "purple"
+  color: "red"
 
 inputs:
   target:
     description: "Target URL (for a quick single-target scan)"
     required: false
   type:
-    description: "Target type: web|api|graphql|cloud|kubernetes"
+    description: "Target type: web|api|graphql|cloud|kubernetes|container|host (grpc is in the enum but no engine covers it, and is rejected)"
     required: false
     default: "web"
   config:
@@ -58,7 +58,7 @@ inputs:
     required: false
     default: "false"
   offline:
-    description: "Air-gapped hardening: engines make no external calls"
+    description: "Air-gapped hardening: passes --offline, which today disables nuclei OAST/interactsh and template update checks; other engines are not yet covered"
     required: false
     default: "false"
   out:
