@@ -72,6 +72,16 @@ most of the findings was running degraded, and nothing said so.
   build verified.
 - `deploy/k8s/job.yaml` mounts an emptyDir on `/home/yubel` as a backstop for
   any tool that insists on writing under `$HOME`.
+- nuclei's config directory is per-run state, not image content: the build
+  removes what it wrote there as root, and each run recreates it under its own
+  uid. Leaving a root-owned `.templates-config.json` behind is what the first
+  attempt at this fix did, and the new uid-10001 check is what caught it.
+- `tests/test_workflows.py` now shell-lints every `RUN` in the Dockerfile with
+  `sh -n`, and rejects a `#` comment inside a `RUN` continuation — whether
+  such a line is stripped by the Dockerfile frontend or passed to the shell
+  (where it comments out the rest of that line) depends on the builder. Both
+  cases verified by sabotage. These are the mistakes that otherwise surface
+  only after a ten-minute image build.
 
 ### Security — the release pipeline could publish a wheel nobody committed
 - **`pypa/gh-action-pypi-publish` was referenced by `release/v1` — a branch.**

@@ -175,8 +175,15 @@ COPY --from=gotools /gobin/nuclei /gobin/httpx /gobin/katana /gobin/dalfox /usr/
 # NUCLEI_TEMPLATES_DIR is read by nuclei itself (cmd/nuclei/main.go), so it
 # points both this build step and every later run at the same place.
 # NUCLEI_CONFIG_DIR has to stay *writable*: nuclei writes
-# `.templates-config.json` on startup, and /tmp is the one path the k8s Job
-# already backs with an emptyDir.
+# `.templates-config.json` on startup — before `-duc` is even consulted — and
+# /tmp is the one path the k8s Job already backs with an emptyDir.
+#
+# The final `rm -rf` matters. This step runs as root, so the config nuclei
+# writes here is root-owned, and the runtime user cannot rewrite it — the
+# build's own uid-10001 check caught exactly that. The config directory is
+# per-run state, not image content (on Kubernetes an emptyDir shadows /tmp
+# regardless), so it is removed and each run recreates it under its own uid.
+# /tmp being 1777 is what makes that work for an arbitrary user.
 ENV NUCLEI_TEMPLATES_DIR=/opt/nuclei-templates \
     NUCLEI_CONFIG_DIR=/tmp/nuclei-config
 RUN set -eux; \
@@ -185,7 +192,8 @@ RUN set -eux; \
     count=$(find /opt/nuclei-templates -name '*.yaml' | wc -l); \
     echo "nuclei templates: ${count}"; \
     [ "${count}" -gt 100 ]; \
-    nuclei -version
+    nuclei -version; \
+    rm -rf /tmp/nuclei-config
 
 # Yubel itself
 WORKDIR /app
@@ -201,12 +209,11 @@ RUN yubel engines --check
 # question. This is exactly what the old build got wrong.
 RUN set -eux; \
     useradd -m -u 10001 yubel; \
-    install -d -o yubel -g yubel /tmp/nuclei-config; \
     su yubel -s /bin/sh -c 'yubel engines --check'; \
     su yubel -s /bin/sh -c 'nuclei -duc -silent -tl > /tmp/tl.txt'; \
     test -s /tmp/tl.txt; \
     echo "nuclei sees $(wc -l < /tmp/tl.txt) templates as uid 10001"; \
-    rm -f /tmp/tl.txt
+    rm -rf /tmp/tl.txt /tmp/nuclei-config
 
 # Non-root by default; scans need no privileges except network egress.
 USER yubel
