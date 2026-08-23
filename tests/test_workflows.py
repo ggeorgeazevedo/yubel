@@ -82,3 +82,72 @@ def test_release_build_tools_are_version_pinned():
         assert re.search(rf'pip install "{tool}==\d', text), (
             f"`pip install {tool}` is unpinned in the job that produces the "
             f"artifact published to PyPI")
+
+
+# --------------------------------------------------------------------------
+# The Dockerfile is shell, and shell has a parser
+# --------------------------------------------------------------------------
+
+DOCKERFILE = ROOT / "Dockerfile"
+
+#: Build args, so a RUN body is a complete script when handed to `sh -n`.
+_ARGS = {"TARGETARCH": "amd64", "NUCLEI_VERSION": "v0", "HTTPX_VERSION": "v0",
+         "KATANA_VERSION": "v0", "DALFOX_VERSION": "v0", "ZAP_VERSION": "0.0.0",
+         "NIKTO_VERSION": "0.0.0", "TESTSSL_VERSION": "v0",
+         "GRAPHQL_COP_VERSION": "0.0"}
+
+
+def _run_blocks():
+    """Every RUN instruction, joined across its line continuations."""
+    blocks, current = [], None
+    for line in DOCKERFILE.read_text(encoding="utf-8").splitlines():
+        if current is not None:
+            current.append(line)
+            if not line.rstrip().endswith("\\"):
+                blocks.append(current)
+                current = None
+        elif re.match(r"^\s*RUN\s", line):
+            current = [line]
+            if not line.rstrip().endswith("\\"):
+                blocks.append(current)
+                current = None
+    if current:
+        blocks.append(current)
+    return blocks
+
+
+def test_the_dockerfile_has_run_instructions_to_check():
+    assert len(_run_blocks()) > 5
+
+
+def test_no_comment_hides_inside_a_run_continuation():
+    """A `#` line inside a continued RUN is at the mercy of two parsers.
+
+    Whether it is stripped by the Dockerfile frontend or passed through to the
+    shell — where it comments out the rest of *that* line — depends on the
+    builder. A comment that changes what runs depending on who builds is not a
+    comment. Put it above the instruction.
+    """
+    offenders = [block[0].strip()[:60] for block in _run_blocks()
+                 if any(line.lstrip().startswith("#") for line in block[1:])]
+    assert not offenders, (
+        "move these comments above their RUN: " + "; ".join(offenders))
+
+
+def test_every_run_body_is_valid_shell():
+    """`sh -n` parses without executing — catches the quoting mistakes that
+    otherwise surface only after a ten-minute image build."""
+    import subprocess
+    import sys
+
+    failures = []
+    for block in _run_blocks():
+        body = re.sub(r"^\s*RUN\s+", "", "\n".join(block), count=1)
+        body = body.replace("\\\n", "\n")
+        for name, value in _ARGS.items():
+            body = body.replace("${%s}" % name, value)
+        done = subprocess.run(["sh", "-n"], input=body,
+                              capture_output=True, text=True)
+        if done.returncode != 0:
+            failures.append(f"{block[0].strip()[:50]}: {done.stderr.strip()}")
+    assert not failures, "\n".join(failures)

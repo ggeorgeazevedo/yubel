@@ -189,3 +189,36 @@ def test_dalfox_uses_the_right_subcommand_for_the_installed_major(
     assert "--url" not in cmd
     assert "--header" not in cmd                      # v3 rejects the singular
     assert "-H" in cmd and "Authorization: Bearer TOK" in cmd
+
+
+def test_nuclei_skips_the_update_check_when_templates_are_pre_provisioned(
+        monkeypatch, tmp_path):
+    """A baked template directory must not be updated at scan time.
+
+    The container image ships templates at a read-only path. Left to itself,
+    nuclei runs an update check on every scan: an outbound call the operator
+    did not ask for, and a write into a directory that is deliberately not
+    writable. On the documented Kubernetes Job — `readOnlyRootFilesystem:
+    true` — that write fails.
+    """
+    from yubel.engines.nuclei import NucleiEngine
+    from yubel.models import Target, TargetType
+
+    target = Target(type=TargetType.WEB, url="https://app.example.com")
+
+    monkeypatch.setenv("NUCLEI_TEMPLATES_DIR", "/opt/nuclei-templates")
+    assert "-duc" in NucleiEngine().build_command(target, str(tmp_path))
+
+    monkeypatch.delenv("NUCLEI_TEMPLATES_DIR", raising=False)
+    assert "-duc" not in NucleiEngine().build_command(target, str(tmp_path))
+
+
+def test_offline_still_disables_interactsh_as_well(monkeypatch, tmp_path):
+    """`--offline` is the stronger promise and must not be weakened by the above."""
+    from yubel.engines.nuclei import NucleiEngine
+    from yubel.models import Target, TargetType
+
+    monkeypatch.delenv("NUCLEI_TEMPLATES_DIR", raising=False)
+    cmd = NucleiEngine({"offline": True}).build_command(
+        Target(type=TargetType.WEB, url="https://app.example.com"), str(tmp_path))
+    assert "-ni" in cmd and "-duc" in cmd
