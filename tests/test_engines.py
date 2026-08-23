@@ -1,4 +1,6 @@
 """Tests for engine adapters and CLI profiles (no external binaries needed)."""
+import pytest
+
 from yubel.config import Config
 from yubel.engines.zap import ZapEngine
 from yubel.engines.nuclei import NucleiEngine
@@ -130,14 +132,20 @@ def test_tls_findings_map_to_cryptographic_failures():
 
 
 def test_dalfox_v3_vs_v2_command():
+    """This test used to assert `--url` for v3 — i.e. it locked in the bug.
+
+    dalfox v3 is a Rust rewrite with no `--url` flag at all: the URL is
+    positional in both lines, and the subcommand is what differs.
+    """
     from yubel.engines.dalfox import DalfoxEngine
     try:
         DalfoxEngine._major = 3
         cmd = DalfoxEngine().build_command(_web("http://t/x?q=1"), "/tmp")
-        assert "--url" in cmd and "http://t/x?q=1" in cmd   # v3 named arg
+        assert cmd[1] == "scan" and cmd[2] == "http://t/x?q=1"
+        assert "--url" not in cmd
         DalfoxEngine._major = 2
         cmd2 = DalfoxEngine().build_command(_web("http://t/x?q=1"), "/tmp")
-        assert "--url" not in cmd2 and "http://t/x?q=1" in cmd2  # v2 positional
+        assert cmd2[1] == "url" and cmd2[2] == "http://t/x?q=1"
     finally:
         DalfoxEngine._major = None
 
@@ -170,3 +178,33 @@ def test_setup_install_plan():
     assert plan_for("zap")[0] == "manual"
     # unknown engine -> None
     assert plan_for("does-not-exist") is None
+
+
+# --------------------------------------------------------------------------
+# dalfox 2.x (Go) and 3.x (Rust) are different programs behind one name
+# --------------------------------------------------------------------------
+
+@pytest.mark.parametrize("major,subcommand", [(2, "url"), (3, "scan")])
+def test_dalfox_uses_the_right_subcommand_for_the_installed_major(
+        monkeypatch, major, subcommand, tmp_path):
+    """v3.0 is a Rust rewrite that consolidated the subcommands under `scan`.
+
+    The previous v3 branch sent `url --url <URL> --header ...`; v3 has no
+    `--url` flag and spells the header flag `--headers`/`-H`, so its parser
+    rejected the invocation. The URL is positional in both lines and `-H` works
+    in both, so the only real difference is the subcommand.
+    """
+    from yubel.engines.dalfox import DalfoxEngine
+    from yubel.models import Auth, Target, TargetType
+
+    engine = DalfoxEngine()
+    monkeypatch.setattr(DalfoxEngine, "_major_version", lambda self: major)
+    target = Target(type=TargetType.WEB, url="https://app.example.com/?q=1",
+                    auth=Auth(kind="bearer", token="TOK"))
+    cmd = engine.build_command(target, str(tmp_path))
+
+    assert cmd[1] == subcommand
+    assert cmd[2] == "https://app.example.com/?q=1"   # positional, not --url
+    assert "--url" not in cmd
+    assert "--header" not in cmd                      # v3 rejects the singular
+    assert "-H" in cmd and "Authorization: Bearer TOK" in cmd

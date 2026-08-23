@@ -16,6 +16,10 @@ INSTALL = {
     "nuclei":       {"brew": "nuclei",  "go": "github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest"},
     "httpx":        {"brew": "httpx",   "go": "github.com/projectdiscovery/httpx/cmd/httpx@latest"},
     "katana":       {"brew": "katana",  "go": "github.com/projectdiscovery/katana/cmd/katana@latest"},
+    # Homebrew ships dalfox 3.x (the Rust rewrite); the Go module path only
+    # ever resolves to the 2.x line, because v3 tags carry no go.mod. Both work
+    # — the adapter detects the major and picks the subcommand — but they are
+    # different programs, so which one you get depends on which installer ran.
     "dalfox":       {"brew": "dalfox",  "go": "github.com/hahwul/dalfox/v2@latest"},
     "nikto":        {"brew": "nikto"},
     "sqlmap":       {"brew": "sqlmap",  "pip": "sqlmap"},

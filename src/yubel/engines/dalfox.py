@@ -113,15 +113,15 @@ class DalfoxEngine(Engine):
     def build_command_for(self, target: Target, workdir: str,
                           url: str = None) -> List[str]:
         url = url or target.endpoint()
-        if self._major_version() >= 3:
-            # dalfox 3.x: URL is a named argument, JSON goes to stdout
-            cmd = [self.binary, "url", "--url", url, "--format", "json", "--silence"]
-            for header in self.auth_headers(target):
-                cmd += ["--header", header]     # 3.x spells it long-form
-        else:
-            # dalfox 2.x: positional URL
-            cmd = [self.binary, "url", url, "--format", "json", "--silence"]
-            cmd += self.auth_args(target)
+        # dalfox 3.0 is a full rewrite in Rust and consolidated the per-input
+        # subcommands under `scan`; `url` survives only as a hidden alias, so
+        # the documented spelling is the one to send. Everything else is
+        # identical across the two lines: the URL is positional in both, and
+        # both take `-H "Name: value"` (v3's long form is `--headers`, plural —
+        # this used to send `--header`, which v3's parser rejects outright).
+        subcommand = "scan" if self._major_version() >= 3 else "url"
+        cmd = [self.binary, subcommand, url, "--format", "json", "--silence"]
+        cmd += self.auth_args(target)
         return cmd
 
     def parse(self, target: Target, workdir: str, stdout: str) -> List[Finding]:

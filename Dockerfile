@@ -31,7 +31,7 @@ ARG PYTHON_VERSION=3.12
 ARG NUCLEI_VERSION=v3.11.1
 ARG HTTPX_VERSION=v1.10.0
 ARG KATANA_VERSION=v1.7.0
-ARG DALFOX_VERSION=v3.2.1
+ARG DALFOX_VERSION=v2.13.0   # last Go release; v3+ is a Rust rewrite, see below
 ARG ZAP_VERSION=2.17.0
 ARG NIKTO_VERSION=2.6.1
 ARG TESTSSL_VERSION=v3.2.4
@@ -57,6 +57,18 @@ RUN set -eux; \
     go install "github.com/projectdiscovery/katana/cmd/katana@${KATANA_VERSION}"; \
     go install "github.com/hahwul/dalfox/v2@${DALFOX_VERSION}"; \
     ls -1 /gobin
+
+# A git tag is not a Go module version, and this is where that bites.
+# dalfox v3.0.0 is a complete rewrite in Rust: those tags carry no `go.mod` at
+# all, so `go install github.com/hahwul/dalfox/v2@v3.2.1` resolves to
+# `github.com/hahwul/dalfox@v3.2.1+incompatible` and fails with "does not
+# contain package .../v2". v2.13.0 is the last Go release and is exactly what
+# the old `@latest` on the `/v2` module path was already resolving to — so the
+# image's dalfox is unchanged by pinning, and pinning is what makes that
+# visible. Moving to v3 means a Rust toolchain in this image *and* re-verifying
+# the adapter against v3's CLI (subcommands consolidated under `scan`,
+# `--concurrence` renamed to `--workers`, `-C/--cookie` to `--cookies`), so it
+# is deliberately a separate change.
 
 # ---- stage 2: runtime ------------------------------------------------------
 FROM python:${PYTHON_VERSION}-slim-bookworm

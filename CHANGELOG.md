@@ -46,6 +46,22 @@ reports normally without having run.
   stage builds on the host architecture and cross-compiles via `GOARCH`, so the
   second architecture costs minutes rather than most of an hour.
 
+### Fixed — dalfox 3.x was invoked with flags it does not have
+dalfox 3.0 is a complete rewrite **in Rust**, not a Go release: its tags carry
+no `go.mod`, which is why pinning the image to `dalfox/v2@v3.2.1` failed the
+build outright with *"does not contain package .../v2"*. The image is pinned to
+`v2.13.0`, the last Go release — and exactly what the old `@latest` on the
+`/v2` module path was already resolving to, so the shipped binary does not
+change. Moving to v3 needs a Rust toolchain in the image and is deliberately a
+separate change.
+
+The adapter's own v3 branch was wrong too, and a test was locking it in: it
+sent `dalfox url --url <URL> --header ...`, and v3 has no `--url` flag (the URL
+is positional) and spells the header flag `--headers`/`-H`. Homebrew ships v3,
+so anyone who installed dalfox that way had the engine failing on every run.
+Both lines take a positional URL and `-H "Name: value"`, so the only real
+difference left is the subcommand: `url` on 2.x, `scan` on 3.x.
+
 ### Fixed — credentials silently dropped for graphql-cop
 Introduced by the previous release's own auth work, and the same shape it was
 written to eliminate. graphql-cop was given `header_flag = "-H"` and nothing
