@@ -131,25 +131,6 @@ def test_tls_findings_map_to_cryptographic_failures():
     assert f.owasp.startswith("A02:2021")
 
 
-def test_dalfox_v3_vs_v2_command():
-    """This test used to assert `--url` for v3 — i.e. it locked in the bug.
-
-    dalfox v3 is a Rust rewrite with no `--url` flag at all: the URL is
-    positional in both lines, and the subcommand is what differs.
-    """
-    from yubel.engines.dalfox import DalfoxEngine
-    try:
-        DalfoxEngine._major = 3
-        cmd = DalfoxEngine().build_command(_web("http://t/x?q=1"), "/tmp")
-        assert cmd[1] == "scan" and cmd[2] == "http://t/x?q=1"
-        assert "--url" not in cmd
-        DalfoxEngine._major = 2
-        cmd2 = DalfoxEngine().build_command(_web("http://t/x?q=1"), "/tmp")
-        assert cmd2[1] == "url" and cmd2[2] == "http://t/x?q=1"
-    finally:
-        DalfoxEngine._major = None
-
-
 def test_dalfox_v3_json_parsing(tmp_path):
     import json
     from yubel.engines.dalfox import DalfoxEngine

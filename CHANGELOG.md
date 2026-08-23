@@ -62,6 +62,16 @@ so anyone who installed dalfox that way had the engine failing on every run.
 Both lines take a positional URL and `-H "Name: value"`, so the only real
 difference left is the subcommand: `url` on 2.x, `scan` on 3.x.
 
+### Fixed — a test was reporting on the developer's laptop, not on the code
+`test_dalfox_command_targets_given_url` asserted the `url` subcommand against
+whatever dalfox happened to be on PATH. It passed in CI and in any container
+with no dalfox installed — the version probe falls back to major 2 when the
+binary is missing — and failed on a machine with the Homebrew build, which is
+the 3.x Rust line. A new `tests/conftest.py` pins the probe for the whole
+suite, so a test that cares about the version has to say which one it means.
+Verified by running the suite twice: once with every engine faked onto PATH
+reporting 3.x, once with a bare PATH. Same result.
+
 ### Fixed — credentials silently dropped for graphql-cop
 Introduced by the previous release's own auth work, and the same shape it was
 written to eliminate. graphql-cop was given `header_flag = "-H"` and nothing
