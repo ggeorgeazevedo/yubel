@@ -27,6 +27,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from yubel.engines import ALL_ENGINES, OPT_IN                    # noqa: E402
 from yubel.models import Target, TargetType                      # noqa: E402
 from yubel.engines import select_for                             # noqa: E402
+from yubel.config import Config                                  # noqa: E402
 
 OUT = ROOT / "docs" / "engines.md"
 
@@ -117,28 +118,49 @@ engine with
 `header_flag`.
 
 `form` and `oauth2` appear in the `Auth` dataclass but no engine implements \
-them."""
+them.
 
-TOP_LEVEL = """\
+Declaring the flag is not sufficient: the *spelling* has to match too. Most \
+tools take
+`-H 'Name: value'`; graphql-cop parses its `-H` with `json.loads()` and wants \
+`-H '{"Name": "value"}'`. An adapter states which it is via `header_style`, \
+because
+graphql-cop reacts to a header it cannot parse by printing one line and \
+carrying on —
+so getting it wrong drops the credentials without failing the run."""
+
+#: Defaults are read off `Config` rather than typed here: this table used to
+#: claim `crawl_max_urls: 50` while the code said 150, which is the drift the
+#: rest of this generator exists to prevent.
+_D = Config()
+
+TOP_LEVEL = f"""\
 | Key | Default | What it does |
 |---|---|---|
-| `parallelism` | 4 | Max engines running at once. |
-| `engines` | all | Allow-list of engine names. An unknown name is now a \
-config error, not a silent no-op. |
+| `parallelism` | {_D.parallelism} | Max engines running at once. |
+| `engines` | all | Allow-list of engine names. An unknown name is a config \
+error, not a silent no-op. |
 | `disable` | — | Deny-list of engine names. |
-| `include_opt_in` | false | Allow intrusive engines (`sqlmap`). |
-| `crawl` | true | Feed crawler-discovered URLs to the parameter scanners. |
-| `crawl_max_urls` | 50 | Cap on discovered URLs seeded per target. |
-| `chains` | true | Synthesize attack chains. |
-| `cluster_threshold` | 8 | Collapse this many similar info/low findings \
-into one. |
+| `include_opt_in` | {str(_D.include_opt_in).lower()} | Allow intrusive \
+engines (`sqlmap`). |
+| `crawl` | {str(_D.crawl).lower()} | Feed crawler-discovered URLs to the \
+parameter scanners. |
+| `crawl_max_urls` | {_D.crawl_max_urls} | Cap on discovered URLs seeded per \
+target. The cap is logged, never a silent truncation. |
+| `chains` | {str(_D.chains).lower()} | Synthesize attack chains. |
+| `cluster_threshold` | {_D.cluster_threshold} | Collapse this many similar \
+info/low findings into one. |
 | `baseline` | — | Prior `yubel.json` to diff against. |
 | `fail_on` | — | Exit non-zero at or above this severity. |
-| `fail_on_new` | false | With `baseline`, gate only on new/regressed. |
-| `output.dir` | yubel-report | Where reports are written. |
-| `output.formats` | json, html, markdown | Reporters to run (`md` is an \
-alias for `markdown`). |
-| `output.sarif` | true | Also emit `yubel.sarif`. |
+| `fail_on_new` | {str(_D.fail_on_new).lower()} | With `baseline`, gate only \
+on new/regressed. |
+| `offline` | {str(_D.offline).lower()} | Air-gapped hardening. Today this \
+reaches **nuclei only** (no OAST/interactsh, no template update check); the \
+other engines ignore it. |
+| `output.dir` | {_D.output.dir} | Where reports are written. |
+| `output.formats` | {", ".join(_D.output.formats)} | Reporters to run (`md` \
+is an alias for `markdown`). |
+| `output.sarif` | {str(_D.output.sarif).lower()} | Also emit `yubel.sarif`. |
 
 Two per-target keys are parsed and then **ignored**: `scope` and `exclude` are \
 read into

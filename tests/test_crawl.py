@@ -67,10 +67,21 @@ def test_nuclei_dast_pass_only_fuzzes_param_urls(tmp_path):
 
 # ---- dalfox scans each discovered parameterized URL -------------------------
 
-def test_dalfox_command_targets_given_url():
+@pytest.mark.parametrize("major,subcommand", [(2, "url"), (3, "scan")])
+def test_dalfox_command_targets_given_url(monkeypatch, major, subcommand):
+    """The point of this test is the *URL*, so the version must not be ambient.
+
+    It used to assert `"url" in cmd` with whatever dalfox happened to be on the
+    machine's PATH. That passes in CI and in any container with no dalfox
+    installed (the probe falls back to major 2) and fails on a laptop with the
+    Homebrew build, which is 3.x — the subcommand there is `scan`. A test that
+    reads the developer's environment is a test that reports on the developer's
+    environment.
+    """
+    monkeypatch.setattr(DalfoxEngine, "_major_version", lambda self: major)
     cmd = DalfoxEngine().build_command_for(_web(), "/tmp", url="http://t.example/x?id=1")
-    assert "http://t.example/x?id=1" in cmd
-    assert "url" in cmd                            # v3/v2 both use the `url` verb
+    assert cmd[1] == subcommand
+    assert cmd[2] == "http://t.example/x?id=1"
 
 
 # ---- orchestrator discovery phase seeds the target --------------------------

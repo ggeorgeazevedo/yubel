@@ -11,6 +11,7 @@ Adapters must never raise on a scanning error: they capture it in EngineRun.
 from __future__ import annotations
 
 import base64
+import json
 import os
 import shutil
 import subprocess
@@ -85,13 +86,29 @@ class Engine:
         headers += [f"{k}: {v}" for k, v in (auth.headers or {}).items()]
         return headers
 
+    #: How this engine's binary wants a header *spelled* after `header_flag`.
+    #: `"colon"` is `Name: value` and is what almost every tool takes.
+    #: `"json"` is `{"Name": "value"}` — graphql-cop parses its `-H` with
+    #: `json.loads()`, and on failure it prints a line and **keeps scanning**,
+    #: so getting this wrong does not fail the run: it drops the credentials
+    #: and reports an anonymous scan as a normal one. Declaring the flag is not
+    #: enough; the spelling has to match too.
+    header_style: str = "colon"
+
+    def format_header(self, header: str) -> str:
+        """Render one `Name: value` header the way this engine's binary wants."""
+        if self.header_style != "json":
+            return header
+        name, _, value = header.partition(":")
+        return json.dumps({name.strip(): value.strip()})
+
     def auth_args(self, target: Target) -> List[str]:
         """argv fragments carrying the credentials, or [] if unsupported."""
         if not self.header_flag:
             return []
         args: List[str] = []
         for header in self.auth_headers(target):
-            args += [self.header_flag, header]
+            args += [self.header_flag, self.format_header(header)]
         return args
 
     def supports_auth(self) -> bool:

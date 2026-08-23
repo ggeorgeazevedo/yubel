@@ -239,7 +239,7 @@ Intrusive engines (currently **sqlmap**) are **off by default** and only run whe
 
 ## Adding an engine
 
-1. Subclass `Engine` in `src/yubel/engines/`, declaring `name`, `supports`, `binary` — and `header_flag` with the tool's add-a-header flag. **Without `header_flag` the engine never receives credentials** and will scan anonymously while reporting a normal result.
+1. Subclass `Engine` in `src/yubel/engines/`, declaring `name`, `supports`, `binary` — and `header_flag` with the tool's add-a-header flag. **Without `header_flag` the engine never receives credentials** and will scan anonymously while reporting a normal result. Check the spelling against the tool's `--help` and set `header_style` (`colon` or `json`) to match.
 2. Implement `build_command()` and `parse()` (return normalized `Finding`s).
 3. Register it in `engines/registry.py`.
 4. Run `python3 scripts/gen_engines.py` and commit `docs/engines.md`. If your adapter reads a new `options` key, add a description for it in that script — CI fails on an undocumented option.

@@ -30,9 +30,15 @@ An engine adapter is a small, self-contained wrapper around one OSS tool.
        binary = "mytool"                 # looked up on PATH
        homepage = "https://…"
        header_flag = "-H"                # the tool's add-a-header flag
+       header_style = "colon"            # 'Name: value' (or "json")
        # Without header_flag, credentials NEVER reach this engine: it will
        # scan anonymously, find a fraction of what it should, and report
        # that as a normal result. `yubel engines` shows it as AUTH=no.
+       #
+       # Check the SPELLING against the tool's --help too. graphql-cop takes
+       # -H '{"Name": "value"}' and reacts to anything else by printing one
+       # line and carrying on — so a wrong style does not fail the run, it
+       # drops the credentials. tests/test_auth.py covers both.
 
        def build_command(self, target, workdir):
            out = f"{workdir}/mytool.json"
