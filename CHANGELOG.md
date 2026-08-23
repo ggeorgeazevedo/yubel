@@ -46,6 +46,29 @@ reports normally without having run.
   stage builds on the host architecture and cross-compiles via `GOARCH`, so the
   second architecture costs minutes rather than most of an hour.
 
+### Security — the release pipeline could publish a wheel nobody committed
+- **`pypa/gh-action-pypi-publish` was referenced by `release/v1` — a branch.**
+  It runs in the one job holding `id-token: write` and the PyPI Trusted
+  Publisher, so anything pushed to that branch could mint the OIDC token and
+  publish an arbitrary wheel as `yubel`, with no commit landing in this
+  repository and nothing in `dist/` changing. Now pinned by commit.
+- **The `build` job inherited the workflow's write scopes.** `release.yml`
+  grants `contents: write` and `id-token: write` for its two publishing jobs;
+  those two redeclare their own minimum, `build` did not. It is the only job
+  that executes third-party code — `pip install build`, `pip install twine`,
+  both unversioned — and with `id-token: write` it could read
+  `$ACTIONS_ID_TOKEN_REQUEST_TOKEN` directly, routing around the
+  `environment: pypi` gate that is meant to be the only path to PyPI. It now
+  declares `permissions: {contents: read}`, and both tools are version-pinned.
+- **All 22 action references across the five workflows are pinned to a full
+  commit SHA**, each with a `# vX.Y.Z` comment so a bump stays reviewable.
+  Dependabot already tracks `github-actions` and updates a SHA pin in place, so
+  the ongoing cost is a review rather than a manual lookup.
+- `tests/test_workflows.py` fails the build if any of the above regresses —
+  an action back on a tag or a branch, a pin without its version comment, the
+  `build` job's permissions removed, or the build tools unpinned. Pinning only
+  holds if un-pinning breaks something; both cases verified by sabotage.
+
 ### Fixed — dalfox 3.x was invoked with flags it does not have
 dalfox 3.0 is a complete rewrite **in Rust**, not a Go release: its tags carry
 no `go.mod`, which is why pinning the image to `dalfox/v2@v3.2.1` failed the
