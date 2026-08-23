@@ -161,7 +161,31 @@ RUN set -eux; \
 
 # Go binaries from stage 1
 COPY --from=gotools /gobin/nuclei /gobin/httpx /gobin/katana /gobin/dalfox /usr/local/bin/
-RUN set -eux; nuclei -update-templates -silent; nuclei -version
+
+# nuclei templates, in a path the runtime user can actually read.
+#
+# This step used to be a bare `nuclei -update-templates` placed *before*
+# `useradd`, so the templates landed in root's home. The runtime process is uid
+# 10001 with HOME=/home/yubel and never found them, so it re-downloaded them at
+# scan time — inside the user's network, which is the thing baking them in was
+# meant to avoid — and on the documented Kubernetes Job, where
+# `readOnlyRootFilesystem: true` and only /out and /tmp are writable, that
+# download fails outright. The image paid the size for templates nothing used.
+#
+# NUCLEI_TEMPLATES_DIR is read by nuclei itself (cmd/nuclei/main.go), so it
+# points both this build step and every later run at the same place.
+# NUCLEI_CONFIG_DIR has to stay *writable*: nuclei writes
+# `.templates-config.json` on startup, and /tmp is the one path the k8s Job
+# already backs with an emptyDir.
+ENV NUCLEI_TEMPLATES_DIR=/opt/nuclei-templates \
+    NUCLEI_CONFIG_DIR=/tmp/nuclei-config
+RUN set -eux; \
+    nuclei -update-templates -silent; \
+    chmod -R a+rX /opt/nuclei-templates; \
+    count=$(find /opt/nuclei-templates -name '*.yaml' | wc -l); \
+    echo "nuclei templates: ${count}"; \
+    [ "${count}" -gt 100 ]; \
+    nuclei -version
 
 # Yubel itself
 WORKDIR /app
@@ -173,8 +197,18 @@ RUN pip install --no-cache-dir .
 # absence let an image go out advertising thirteen engines with eleven in it.
 RUN yubel engines --check
 
+# ...and again as the runtime user, because "root can read it" is not the
+# question. This is exactly what the old build got wrong.
+RUN set -eux; \
+    useradd -m -u 10001 yubel; \
+    install -d -o yubel -g yubel /tmp/nuclei-config; \
+    su yubel -s /bin/sh -c 'yubel engines --check'; \
+    su yubel -s /bin/sh -c 'nuclei -duc -silent -tl > /tmp/tl.txt'; \
+    test -s /tmp/tl.txt; \
+    echo "nuclei sees $(wc -l < /tmp/tl.txt) templates as uid 10001"; \
+    rm -f /tmp/tl.txt
+
 # Non-root by default; scans need no privileges except network egress.
-RUN useradd -m -u 10001 yubel
 USER yubel
 WORKDIR /out
 

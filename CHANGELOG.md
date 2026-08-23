@@ -46,6 +46,33 @@ reports normally without having run.
   stage builds on the host architecture and cross-compiles via `GOARCH`, so the
   second architecture costs minutes rather than most of an hour.
 
+### Fixed — nuclei ran without the templates the image ships
+`nuclei -update-templates` ran as root, *before* `useradd`, so the templates
+landed in root's home. The runtime process is uid 10001 with
+`HOME=/home/yubel` and never found them: every scan re-downloaded them inside
+the user's network — the exact outbound call baking them in was meant to
+avoid — and the image carried a copy nothing used.
+
+On the Kubernetes Job in `deploy/k8s/`, which sets `readOnlyRootFilesystem:
+true` with an emptyDir on only `/out` and `/tmp`, that download cannot succeed
+at all. So in the deployment this project documents, the engine that produces
+most of the findings was running degraded, and nothing said so.
+
+- Templates are installed to `/opt/nuclei-templates` and made world-readable;
+  `NUCLEI_TEMPLATES_DIR` points both the build step and every later run at it.
+  `NUCLEI_CONFIG_DIR` moves to `/tmp`, which stays writable — nuclei writes
+  `.templates-config.json` on startup and would otherwise fail on a read-only
+  root.
+- The adapter passes `-duc` whenever the templates were pre-provisioned, so a
+  baked read-only directory is never updated mid-scan. `--offline` still sends
+  both `-ni` and `-duc`; it is the stronger promise and is unchanged.
+- The build now counts the templates, and then **re-checks as uid 10001** —
+  `yubel engines --check` and `nuclei -tl` both run as the runtime user. "Root
+  can read it" was never the question, and that is precisely what the old
+  build verified.
+- `deploy/k8s/job.yaml` mounts an emptyDir on `/home/yubel` as a backstop for
+  any tool that insists on writing under `$HOME`.
+
 ### Security — the release pipeline could publish a wheel nobody committed
 - **`pypa/gh-action-pypi-publish` was referenced by `release/v1` — a branch.**
   It runs in the one job holding `id-token: write` and the PyPI Trusted

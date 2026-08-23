@@ -43,6 +43,13 @@ spec:
             - { name: config, mountPath: /config, readOnly: true }
             - { name: out, mountPath: /out }
             - { name: tmp, mountPath: /tmp }
+            # readOnlyRootFilesystem means every path a tool writes to has to
+            # be mounted. /tmp covers nuclei's config dir (NUCLEI_CONFIG_DIR)
+            # and the engines' scratch space; home is here as a backstop for
+            # any tool that insists on writing under $HOME. The templates
+            # themselves are read-only in the image at /opt/nuclei-templates,
+            # which is the point — nothing needs to download them at scan time.
+            - { name: home, mountPath: /home/yubel }
           env:
             - name: JUICE_TOKEN
               valueFrom:
@@ -53,4 +60,6 @@ spec:
         - name: out
           emptyDir: {}
         - name: tmp
+          emptyDir: {}
+        - name: home
           emptyDir: {}

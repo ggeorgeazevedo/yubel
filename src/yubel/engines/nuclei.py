@@ -155,6 +155,14 @@ class NucleiEngine(Engine):
         if self.options.get("offline"):
             # air-gapped: no OAST/interactsh callbacks, no update checks
             cmd += ["-ni", "-duc"]
+        elif os.environ.get("NUCLEI_TEMPLATES_DIR"):
+            # The templates were provisioned ahead of time (the container image
+            # bakes them into a read-only path). Letting nuclei run its update
+            # check then means an unexpected outbound call at scan time and a
+            # write into a directory that is deliberately not writable — on the
+            # documented Kubernetes Job, with `readOnlyRootFilesystem: true`,
+            # that write fails and the pass runs with whatever it can reach.
+            cmd += ["-duc"]
         if self.options.get("rate_limit"):
             cmd += ["-rl", str(self.options["rate_limit"])]
         cmd += self.auth_args(target)
