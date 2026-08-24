@@ -6,6 +6,36 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow
 
 ## [Unreleased]
 
+### Changed
+Nothing shipped defaults to a floating image tag any more. `action.yml`, the
+Kubernetes Job manifest and the Helm chart all resolved to
+`ghcr.io/ggeorgeazevedo/yubel:latest`, which made pinning the action pointless:
+someone who pinned it to a commit SHA — as our own test demands of every action
+we consume — still received whatever image had been pushed last. For a scanner
+this is worse than for most software, because the tool version decides the
+finding set: two runs of the same pinned pipeline were not the same scan, and
+nothing recorded the difference. The action and the Job now name the release
+version; the chart resolves an empty `image.tag` to its `appVersion`, so it has
+no second place to drift from. A version tag rather than a digest, because the
+image is built from the git tag created *after* these files are written — the
+digest cannot exist in the commit that would have to name it.
+
+### Added
+CI renders the Helm chart. Nothing ever did — the Python tests read the chart's
+YAML, and reading YAML does not catch a template that fails to render. That is
+how `image.tag: latest` survived four releases sitting next to an `appVersion`
+it contradicted. `helm lint` plus `helm template` in both modes now run on every
+PR, and one of the assertions is that an empty `image.tag` resolves to the
+chart's `appVersion` — getting that wrong renders `repository:` with nothing
+after the colon, which Kubernetes reads as `:latest`.
+
+The pushed image carries an SBOM and `provenance: mode=max`. Every tool version
+is already an ARG, but a digest still said nothing about what ended up inside
+it; now the packages are listed, and the workflow, commit and build arguments
+that produced the digest are recorded. Only on the push build — `load: true`
+uses the docker exporter, which cannot carry attestations and fails the build
+if asked for them.
+
 ## [0.8.1] — 2026-08-24
 
 Supersedes 0.8.0, which was tagged on a commit that is not on `main`.

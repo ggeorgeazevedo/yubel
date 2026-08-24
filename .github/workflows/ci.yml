@@ -31,3 +31,38 @@ jobs:
         run: pytest -q
       - name: Selftest (no network)
         run: yubel selftest -o /tmp/selftest
+
+  # Nothing ever rendered this chart. That is how `image.tag: latest` survived
+  # four releases sitting next to an `appVersion` it contradicted: the Python
+  # tests read the YAML, and reading YAML does not catch a template that fails
+  # to render. `lint` checks the chart's shape; `template` is the one that
+  # actually executes the Go templates and would have caught an unclosed `{{`,
+  # a missing helper, or an `image.tag` that resolves to nothing.
+  chart:
+    name: helm chart
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310  # v5.0.1
+        with:
+          version: v3.16.4
+      - name: Lint
+        run: helm lint deploy/helm/yubel
+      - name: Render both modes
+        run: |
+          set -eux
+          helm template yubel deploy/helm/yubel > /tmp/job.yaml
+          helm template yubel deploy/helm/yubel --set mode=cronjob > /tmp/cronjob.yaml
+          grep -q 'kind: Job' /tmp/job.yaml
+          grep -q 'kind: CronJob' /tmp/cronjob.yaml
+      # An empty `image.tag` must fall back to the chart's appVersion. Getting
+      # this wrong renders `repository:` with nothing after the colon, which
+      # Kubernetes reads as `:latest` — the exact default we just removed,
+      # reintroduced by silence.
+      - name: The image tag resolves to the chart's appVersion
+        run: |
+          set -eux
+          want="$(grep '^appVersion:' deploy/helm/yubel/Chart.yaml | tr -d '"' | awk '{print $2}')"
+          grep -q "image: \"ghcr.io/ggeorgeazevedo/yubel:${want}\"" /tmp/job.yaml
+          helm template yubel deploy/helm/yubel --set image.tag=0.0.0-test \
+            | grep -q 'image: "ghcr.io/ggeorgeazevedo/yubel:0.0.0-test"'
