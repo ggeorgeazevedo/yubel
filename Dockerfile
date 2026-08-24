@@ -55,15 +55,22 @@ ARG NUCLEI_VERSION
 ARG HTTPX_VERSION
 ARG KATANA_VERSION
 ARG DALFOX_VERSION
-ENV GOBIN=/gobin CGO_ENABLED=0 GOTOOLCHAIN=auto GOOS=linux
+# GOBIN is deliberately NOT set. `go install` refuses to honour it while
+# cross-compiling — "cannot install cross-compiled binaries when GOBIN is set" —
+# so with GOBIN this stage built fine for amd64 and failed for every other
+# architecture. Without it, native builds land in $GOPATH/bin and cross builds
+# in $GOPATH/bin/${GOOS}_${GOARCH}; the `find` below collects either shape.
+ENV CGO_ENABLED=0 GOTOOLCHAIN=auto GOOS=linux
 RUN set -eux; \
     export GOARCH="${TARGETARCH}"; \
-    mkdir -p /gobin; \
     go install "github.com/projectdiscovery/nuclei/v3/cmd/nuclei@${NUCLEI_VERSION}"; \
     go install "github.com/projectdiscovery/httpx/cmd/httpx@${HTTPX_VERSION}"; \
     go install "github.com/projectdiscovery/katana/cmd/katana@${KATANA_VERSION}"; \
     go install "github.com/hahwul/dalfox/v2@${DALFOX_VERSION}"; \
-    ls -1 /gobin
+    mkdir -p /gobin; \
+    find "$(go env GOPATH)/bin" -type f -exec mv {} /gobin/ \; ; \
+    ls -1 /gobin; \
+    for b in nuclei httpx katana dalfox; do test -x "/gobin/$b"; done
 
 # A git tag is not a Go module version, and this is where that bites.
 # dalfox v3.0.0 is a complete rewrite in Rust: those tags carry no `go.mod` at

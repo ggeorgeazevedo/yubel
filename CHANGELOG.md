@@ -146,6 +146,22 @@ the paths its tools write to. Each fix above was verified by sabotage.
 
 ### Fixed
 
+**The arm64 image never built, and every pull request was green anyway**
+
+`go install` refuses to honour `GOBIN` while cross-compiling — *"cannot install
+cross-compiled binaries when GOBIN is set"* — so the Go stage worked for amd64
+and failed for every other architecture. The stage now leaves `GOBIN` unset and
+collects the binaries from wherever the toolchain put them (`$GOPATH/bin` when
+native, `$GOPATH/bin/${GOOS}_${GOARCH}` when cross), then asserts all four are
+present.
+
+The reason this reached `main` at all is the more useful half. The PR gate
+builds amd64 only, because a multi-platform build cannot be `--load`ed into the
+daemon for the smoke test — so the architecture that broke was the one never
+built before merging. The workflow now also builds every published architecture
+on pull requests, without pushing. A verification step that skips an
+architecture is not verifying the image, it is verifying half of it.
+
 **Four defaults in the generated engine reference were wrong**
 
 `scripts/gen_engines.py` verifies that every option *has* a description; nothing
