@@ -1,6 +1,11 @@
 image:
   repository: ghcr.io/ggeorgeazevedo/yubel
-  tag: latest
+  # Empty means the chart's appVersion, which is the release this chart was
+  # written against. It was `latest`, and for a scanner that is worse than for
+  # most software: the tool version decides the finding set, so the same Job
+  # manifest run three months apart is a different scan with no record of the
+  # difference. Set this explicitly to pin to another release or a digest.
+  tag: ""
   pullPolicy: IfNotPresent
 
 # "job" for a one-shot scan, "cronjob" for scheduled DAST
