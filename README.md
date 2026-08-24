@@ -121,6 +121,7 @@ yubel scan -c yubel.yaml -o report/
 ```yaml
 parallelism: 4
 fail_on: high            # CI gate: exit non-zero if any finding >= high
+allow_internal: true     # this config needs it: the cluster below is RFC1918
 targets:
   - { name: shop, type: web, url: https://shop.example.com,
       auth: { kind: bearer, token: ${SHOP_TOKEN} } }
@@ -132,6 +133,13 @@ output: { dir: report, formats: [json, html, markdown], sarif: true }
 ```
 
 Secrets stay out of git via `${ENV_VAR}` expansion.
+
+Link-local (169.254.0.0/16 — the cloud metadata service), loopback and RFC1918
+targets are **refused by default**, including URLs the crawler discovers at
+runtime; `--allow-internal` (or `allow_internal: true`, as above) is the way
+through for an authorized internal assessment. A hostname is never resolved, so
+a name pointing at an internal address still passes — see
+[`SECURITY.md`](SECURITY.md) for why that limit is deliberate.
 
 ## Deploy
 

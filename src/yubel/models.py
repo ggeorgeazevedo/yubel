@@ -51,6 +51,17 @@ class Auth:
         return self.kind and self.kind != "none"
 
 
+#: The vantage points kube-hunter can be run from. This tuple is the only
+#: place they are written down: `--k8s-mode` builds its argparse `choices`
+#: from it, `Config.validate()` checks the YAML path against it, and
+#: `KubeHunterEngine` matches on it. They used to be three independent
+#: literals and two comments, which is exactly why the YAML path accepted
+#: anything: `k8s_mode: pods` fell past all three branches and kube-hunter
+#: ran with no vantage flag at all — a clean report for a scan that never
+#: happened.
+K8S_MODES = ("remote", "internal", "pod")
+
+
 @dataclass
 class Target:
     """A single thing to scan."""
@@ -60,7 +71,7 @@ class Target:
     port: Optional[int] = None
     openapi: Optional[str] = None        # path/URL to OpenAPI/Swagger spec
     kubeconfig: Optional[str] = None     # for kubernetes targets
-    k8s_mode: str = "remote"             # remote|internal|pod
+    k8s_mode: str = "remote"             # one of K8S_MODES
     scope: List[str] = field(default_factory=list)   # in-scope host regexes
     exclude: List[str] = field(default_factory=list)  # out-of-scope regexes
     auth: Auth = field(default_factory=Auth)

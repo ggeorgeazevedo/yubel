@@ -17,6 +17,17 @@ Safe defaults:
 - ZAP runs its **passive** baseline scan by default. `options.zap.mode: full`
   switches to `zap-full-scan.py`, which actively attacks the target — set it
   deliberately, and only where you are authorised to.
+- **Internal addresses are refused by default.** Link-local (169.254.0.0/16 —
+  the cloud instance metadata service), loopback and RFC1918 targets are
+  rejected before anything runs, and URLs the crawler discovers at runtime are
+  filtered the same way. The reason is specific: that endpoint answers with the
+  credentials of whatever is running the scan, nuclei runs with `-irr` so the
+  response is attached to the finding, and `redact.py` deliberately does not
+  mask a secret found *on a target* — masking it would destroy the finding.
+  Pass `--allow-internal` (or `allow_internal: true`) for an authorized
+  internal assessment. Note the limit: **a hostname is never resolved**, so a
+  name pointing at an internal address still passes. This refuses what can be
+  refused by inspection, not everything internal that is reachable.
 - **`scope` and `exclude` are not implemented.** They are accepted in a
   target and read by no engine, so a config that sets them is not scoped in
   any way. Do not rely on them to bound a scan; bound it by pointing Yubel

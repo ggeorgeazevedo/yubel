@@ -16,6 +16,7 @@ from .config import Config
 from .engines import select_for
 from .engines.demo import DemoEngine
 from .models import ScanResult, Target
+from .netguard import internal_reason
 
 ProgressCb = Optional[Callable[[str], None]]
 
@@ -122,12 +123,48 @@ class Orchestrator:
             tgt = by_label.get(f.target)
             if not tgt or not endpoints:
                 continue
+            endpoints = self._contain(endpoints, tgt, result)
+            if not endpoints:
+                continue
             cap = self.config.crawl_max_urls
             tgt.seed_urls = endpoints[:cap] if cap and cap > 0 else endpoints
             dropped = max(0, len(endpoints) - len(tgt.seed_urls))
             note = f" (capped from {len(endpoints)}; raise crawl_max_urls)" if dropped else ""
             self.progress(f"  → crawler surfaced {len(tgt.seed_urls)} URL(s) for "
                           f"{tgt.label}; feeding the parameter scanners{note}")
+
+    def _contain(self, urls, target: Target, result: ScanResult):
+        """Drop discovered URLs that `Config.validate()` would have refused.
+
+        `validate()` runs once, before anything executes, and sees only the
+        targets the operator wrote. These URLs come from the crawler at
+        runtime — katana follows links, and with `-jc` it extracts routes out
+        of JS bundles — so a link to `169.254.169.254` on the target's own
+        pages walks straight past the check and into nuclei and dalfox.
+        Refusing at the seam is the only place that covers it.
+
+        Refusals are recorded, not just dropped: the count and the first
+        reason go onto the crawler's `EngineRun.message`, so `yubel.json`
+        carries the fact. "The scan ignored something" must never be
+        deducible only from a smaller number.
+        """
+        if self.config.allow_internal:
+            return urls
+        kept, refused = [], []
+        for url in urls:
+            reason = internal_reason(url)
+            if reason:
+                refused.append(f"{url} ({reason})")
+            else:
+                kept.append(url)
+        if refused:
+            note = (f"{len(refused)} discovered URL(s) refused as internal; "
+                    f"first: {refused[0]}")
+            self.progress(f"  ! {note}")
+            for rec in result.runs:
+                if rec.engine == "katana" and rec.target == target.label:
+                    rec.message = f"{rec.message} — {note}" if rec.message else note
+        return kept
 
     def _run_one(self, engine, target: Target):
         try:

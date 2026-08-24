@@ -12,6 +12,12 @@ fail_on: high                # CI gate: exit non-zero if a finding >= high
 chains: true                 # synthesize multi-step attack chains
 cluster_threshold: 8         # collapse >=N similar info/low findings into one
 offline: false               # air-gapped: engines make no external calls (no OAST/updates)
+# Link-local (169.254/16 — the cloud metadata service), loopback and RFC1918
+# targets are refused by default: that endpoint answers with the credentials of
+# whatever is running the scan, and nuclei's `-irr` would put them whole in the
+# report. This file needs the escape hatch because target 5 below is a cluster
+# on 10.0.0.10 — an internal assessment, the authorized case the flag is for.
+allow_internal: true
 # baseline: baseline.json    # diff against a prior yubel.json (new/fixed/regressed)
 # fail_on_new: true          # with baseline, gate only on NEW/regressed findings
 

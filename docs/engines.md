@@ -142,6 +142,7 @@ A target type with no engine is a config error, not an empty report.
 | `fail_on` | — | Exit non-zero at or above this severity. |
 | `fail_on_new` | false | With `baseline`, gate only on new/regressed. |
 | `offline` | false | Air-gapped hardening. Today this reaches **nuclei only** (no OAST/interactsh, no template update check); the other engines ignore it. |
+| `allow_internal` | false | Permit link-local (169.254/16 — the cloud metadata service), loopback and RFC1918 targets. Refused by default, including URLs the crawler discovers at runtime. A hostname is never resolved, so a name pointing at an internal address still passes. |
 | `output.dir` | yubel-report | Where reports are written. |
 | `output.formats` | json, html, markdown | Reporters to run (`md` is an alias for `markdown`). |
 | `output.sarif` | true | Also emit `yubel.sarif`. |
