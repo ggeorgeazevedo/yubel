@@ -119,6 +119,18 @@ class NucleiEngine(Engine):
             selected.append(True)
         return selected or [False]
 
+    def handles(self, target: Target) -> bool:
+        """Supporting the target type is not enough — there has to be a URL.
+
+        A `kubernetes` target is exempt from the endpoint check in
+        `Config.validate()` (kube-hunter reaches a cluster without one), and
+        `handles()` used to look only at the type. So the Kubernetes Job this
+        project ships ran `nuclei -u ''` on every scan and reported it as a
+        normal, finding-free run. nuclei covers a cluster *via its ingress*,
+        which means it needs the ingress URL.
+        """
+        return super().handles(target) and bool(target.endpoint())
+
     def build_command(self, target: Target, workdir: str) -> List[str]:
         """The base contract: the full-template pass."""
         return self.build_command_for(target, workdir, dast=False)

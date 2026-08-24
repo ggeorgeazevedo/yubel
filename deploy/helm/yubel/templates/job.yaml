@@ -21,12 +21,20 @@ containers:
       - { name: config, mountPath: /config, readOnly: true }
       - { name: out, mountPath: /out }
       - { name: tmp, mountPath: /tmp }
+      # readOnlyRootFilesystem means every path a tool writes to must be
+      # mounted. /tmp carries nuclei's config dir (NUCLEI_CONFIG_DIR) and the
+      # engines' scratch space; home is the backstop for any tool that insists
+      # on writing under $HOME. deploy/k8s/job.yaml has had this since the
+      # nuclei-templates fix; the chart had not, so a Helm install still hit it.
+      - { name: home, mountPath: /home/yubel }
 volumes:
   - name: config
     configMap: { name: {{ include "yubel.fullname" . }}-config }
   - name: out
     emptyDir: {}
   - name: tmp
+    emptyDir: {}
+  - name: home
     emptyDir: {}
 {{- end -}}
 {{- if eq .Values.mode "cronjob" }}

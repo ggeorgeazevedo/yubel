@@ -91,6 +91,25 @@ class Config:
                 errors.append(f"api target {t.label} needs 'openapi' or 'url'")
         errors += self._unknown_engine_errors()
         errors += self._uncovered_target_errors()
+        errors += self._bad_option_value_errors()
+        return errors
+
+    def _bad_option_value_errors(self) -> List[str]:
+        """Reject option values an engine does not understand.
+
+        Unknown option *keys* are already rejected. A known key holding an
+        unknown value is the same bug one level down — `zap: {mode: passive}`
+        was accepted and quietly ran the default scan instead.
+        """
+        from .engines import registry
+
+        known = registry()
+        errors = []
+        for name, options in (self.options or {}).items():
+            engine_cls = known.get(name)
+            if engine_cls is None or not isinstance(options, dict):
+                continue
+            errors += engine_cls.option_errors(options)
         return errors
 
     def _uncovered_target_errors(self) -> List[str]:

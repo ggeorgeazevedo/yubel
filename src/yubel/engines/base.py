@@ -115,6 +115,17 @@ class Engine:
         """Whether credentials reach this engine at all (for `yubel engines`)."""
         return bool(self.header_flag)
 
+    @classmethod
+    def option_errors(cls, options: dict) -> List[str]:
+        """Complaints about this engine's option *values*, for `Config.validate`.
+
+        `Config` already rejects unknown option *keys*. A key with a value the
+        adapter does not understand is the same failure one level down: it is
+        accepted, silently ignored, and the scan runs as though it had never
+        been set. Engines with enumerated options override this.
+        """
+        return []
+
     # ---- command construction (implemented by subclasses) --------------
     # This is the contract every engine must honour, and `run()` below calls
     # exactly this: two positional arguments, no more. A subclass may *widen*

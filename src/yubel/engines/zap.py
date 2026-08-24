@@ -24,9 +24,40 @@ class ZapEngine(Engine):
     default_timeout = 1800
     homepage = "https://www.zaproxy.org/"
 
-    #: candidate entrypoints in priority order per target type
-    WEB_SCRIPTS = ("zap-full-scan.py", "zap-baseline.py")
+    #: Every web entrypoint, for the availability probe. Which one actually
+    #: runs is decided by `mode`, not by this order.
+    WEB_SCRIPTS = ("zap-baseline.py", "zap-full-scan.py")
     API_SCRIPTS = ("zap-api-scan.py",)
+
+    #: `mode` -> scripts in the order we would like to use them.
+    #:
+    #: `baseline` is the default, and it is the passive spider: it crawls and
+    #: reports what it observes. `full` is `zap-full-scan.py`, which actively
+    #: attacks the target.
+    #:
+    #: This used to key off `mode == "baseline"` with everything else falling
+    #: through to the full scan — so the *default* was the active scan, while
+    #: `docs/engines.md` and SECURITY.md's "safe defaults" both said passive.
+    #: Pointing Yubel at production on defaults attacked it. A DAST tool that
+    #: attacks by default has to say so; this one said the opposite, so the
+    #: code moved rather than the promise.
+    MODES = {
+        "baseline": ("zap-baseline.py", "zap-full-scan.py"),
+        "full": ("zap-full-scan.py",),
+    }
+    DEFAULT_MODE = "baseline"
+
+    @classmethod
+    def option_errors(cls, options: dict) -> List[str]:
+        mode = options.get("mode")
+        if mode is None:
+            return []
+        if str(mode).strip().lower() in cls.MODES:
+            return []
+        return [f"options.zap.mode: unknown value {mode!r} "
+                f"(expected {' or '.join(sorted(cls.MODES))}); "
+                f"an unrecognised mode would silently run the "
+                f"{cls.DEFAULT_MODE} scan"]
 
     def _script(self, target: Target) -> str:
         candidates = self.API_SCRIPTS if target.type in (
@@ -37,9 +68,15 @@ class ZapEngine(Engine):
         return ""
 
     def _web_scripts(self):
-        if self.options.get("mode") == "baseline":
-            return ("zap-baseline.py", "zap-full-scan.py")
-        return self.WEB_SCRIPTS
+        """Scripts to try for a web target, most-preferred first.
+
+        `full` deliberately does NOT fall back to the baseline script: asking
+        for an active scan and silently getting a passive one is the failure
+        this project keeps removing. With no full-scan script installed the
+        run is recorded as skipped, which is the honest answer.
+        """
+        mode = str(self.options.get("mode", self.DEFAULT_MODE)).strip().lower()
+        return self.MODES.get(mode, self.MODES[self.DEFAULT_MODE])
 
     def available(self) -> bool:
         return any(shutil.which(s) for s in
