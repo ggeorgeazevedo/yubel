@@ -94,6 +94,17 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # `sbom` and `provenance` ride only on the push build. The verification
+      # build above uses `load: true`, and the docker exporter cannot carry
+      # attestations — asking for them there fails the build instead of
+      # producing them.
+      #
+      # What they buy: the Dockerfile pins every tool version as an ARG, but a
+      # digest still says nothing about what ended up inside it. The SBOM lists
+      # the packages; `provenance: mode=max` records which workflow, which
+      # commit and which build arguments produced that digest. Neither pins the
+      # two base images still pulled by tag — that is the next item — but they
+      # make the result auditable after the fact instead of unknowable.
       - name: Build multi-arch and push (main/tags)
         if: github.event_name == 'push'
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0
@@ -103,5 +114,7 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          sbom: true
+          provenance: mode=max
           cache-from: type=gha
           cache-to: type=gha,mode=max

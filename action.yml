@@ -65,10 +65,22 @@ inputs:
     description: "Output directory for reports (relative to the workspace)"
     required: false
     default: "yubel-report"
+  # This default tracks the action's own version, and a test enforces that.
+  # It used to be `:latest`, which made pinning the action pointless: someone
+  # who pinned us to a commit SHA — as our own test now requires of every
+  # action we consume — still received whatever image had been pushed last.
+  # The lock was on the door and the window was open.
+  #
+  # A version tag rather than a digest, on purpose: the image for a version is
+  # built from the git tag, which is created after this file is written, so the
+  # digest cannot exist in the commit that would have to name it. The cost is a
+  # window of minutes between merging a release PR and pushing its tag, during
+  # which `main` names an image not yet published. Use a release ref rather
+  # than `main` and the window is invisible.
   image:
-    description: "Container image to run"
+    description: "Container image to run (defaults to the image built for this action's version)"
     required: false
-    default: "ghcr.io/ggeorgeazevedo/yubel:latest"
+    default: "ghcr.io/ggeorgeazevedo/yubel:0.8.1"
   upload-sarif:
     description: >-
       Upload yubel.sarif to GitHub code scanning. Requires the calling job to

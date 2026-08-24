@@ -5,7 +5,7 @@ securityContext:
   {{- toYaml .Values.podSecurityContext | nindent 2 }}
 containers:
   - name: yubel
-    image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+    image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
     imagePullPolicy: {{ .Values.image.pullPolicy }}
     args: {{ toJson .Values.args }}
     securityContext:

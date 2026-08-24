@@ -198,6 +198,46 @@ def test_every_run_body_is_valid_shell():
 
 
 # --------------------------------------------------------------------------
+# What went into a digest has to be answerable later
+# --------------------------------------------------------------------------
+
+def _docker_build_steps():
+    data = yaml.safe_load((ROOT / ".github" / "workflows" / "docker.yml")
+                          .read_text(encoding="utf-8"))
+    return [step for step in data["jobs"]["build"]["steps"]
+            if "build-push-action" in str(step.get("uses", ""))]
+
+
+def test_the_pushed_image_carries_an_sbom_and_provenance():
+    """Every tool version is an ARG, but a digest still says nothing about
+    what is inside it. The SBOM lists the packages; `provenance: mode=max`
+    records the workflow, commit and build arguments that produced the digest.
+    """
+    pushed = [s for s in _docker_build_steps() if s.get("with", {}).get("push") is True]
+    assert pushed, "no pushing build step found in docker.yml"
+    for step in pushed:
+        with_ = step["with"]
+        assert with_.get("sbom") is True, f"{step.get('name')}: no SBOM"
+        assert with_.get("provenance") == "mode=max", (
+            f"{step.get('name')}: provenance is {with_.get('provenance')!r}")
+
+
+def test_the_loaded_verification_build_asks_for_no_attestations():
+    """Not a style rule — the docker exporter cannot carry them.
+
+    `load: true` with `sbom`/`provenance` fails the build rather than
+    producing anything, so copying the two lines onto the smoke-test build
+    would break every PR.
+    """
+    for step in _docker_build_steps():
+        with_ = step.get("with", {})
+        if with_.get("load") is True:
+            assert "sbom" not in with_ and "provenance" not in with_, (
+                f"{step.get('name')}: attestations on a `load: true` build "
+                f"fail the build (the docker exporter cannot carry them)")
+
+
+# --------------------------------------------------------------------------
 # One version, and a changelog that resolves
 # --------------------------------------------------------------------------
 
@@ -214,7 +254,75 @@ def _declared_versions():
     chart = yaml.safe_load(
         (ROOT / "deploy" / "helm" / "yubel" / "Chart.yaml").read_text(encoding="utf-8"))
     found["deploy/helm/yubel/Chart.yaml (appVersion)"] = str(chart["appVersion"])
+    for path, tag in _shipped_image_tags().items():
+        found[path] = tag
     return found
+
+
+#: The image references a consumer gets by default, without asking for a
+#: version. The Helm chart is absent on purpose: its template resolves an
+#: empty `image.tag` to `.Chart.AppVersion`, which is already in the dict
+#: above, so it has no second place to drift from.
+def _shipped_image_tags():
+    action = yaml.safe_load((ROOT / "action.yml").read_text(encoding="utf-8"))
+    job = yaml.safe_load((ROOT / "deploy" / "k8s" / "job.yaml").read_text(encoding="utf-8"))
+    container, = job["spec"]["template"]["spec"]["containers"]
+    return {
+        "action.yml (image default)": action["inputs"]["image"]["default"].rsplit(":", 1)[1],
+        "deploy/k8s/job.yaml (image)": container["image"].rsplit(":", 1)[1],
+    }
+
+
+#: `latest` and `main` move; a bare `0.8` moves within its minor. Any of the
+#: three turns "the scan I ran" into "a scan someone ran with something".
+_FLOATING = {"latest", "main", "edge", "stable"}
+
+
+def test_no_shipped_default_points_at_a_floating_tag():
+    """Pinning the action was pointless while its image default was `:latest`.
+
+    A consumer who pinned this action to a commit SHA — which our own test
+    demands of every action we consume — still received whatever image had
+    been pushed last. The lock was on the door and the window was open. For a
+    scanner it is worse than for most software: the tool version decides the
+    finding set, so an unpinned image means two runs of the same pinned
+    pipeline are not the same scan, and nothing records the difference.
+    """
+    offenders = {path: tag for path, tag in _shipped_image_tags().items()
+                 if tag in _FLOATING or re.fullmatch(r"\d+(\.\d+)?", tag)}
+    assert not offenders, f"floating image tag: {offenders}"
+
+
+def test_the_chart_is_rendered_somewhere_in_ci():
+    """Reading the chart's YAML is not rendering it.
+
+    These Python tests parse `values.yaml` and the template as text, which
+    catches a wrong value and nothing else — an unclosed `{{`, a renamed
+    helper or a tag that resolves to empty all still ship. Only `helm
+    template` executes the thing. Nothing did, which is how `image.tag:
+    latest` sat next to an `appVersion` it contradicted for four releases.
+    """
+    ci = yaml.safe_load((ROOT / ".github" / "workflows" / "ci.yml")
+                        .read_text(encoding="utf-8"))
+    steps = [step for job in ci["jobs"].values() for step in job["steps"]]
+    runs = " ".join(str(step.get("run", "")) for step in steps)
+    assert "helm template" in runs, "no job renders the Helm chart"
+    assert "helm lint" in runs, "no job lints the Helm chart"
+
+
+def test_the_chart_resolves_its_image_tag_to_the_app_version():
+    """`values.yaml` must stay empty and the template must supply the default.
+
+    Writing the version into `values.yaml` instead would work today and drift
+    tomorrow, because nothing would tie it to `appVersion`.
+    """
+    chart_dir = ROOT / "deploy" / "helm" / "yubel"
+    values = yaml.safe_load((chart_dir / "values.yaml").read_text(encoding="utf-8"))
+    assert values["image"]["tag"] == "", (
+        "image.tag should be empty so the chart falls back to appVersion")
+    template = (chart_dir / "templates" / "job.yaml").read_text(encoding="utf-8")
+    assert "default .Chart.AppVersion" in template, (
+        "with an empty image.tag and no default, the chart renders `repo:`")
 
 
 def test_every_declared_version_agrees():
