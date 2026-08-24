@@ -2,9 +2,9 @@ apiVersion: v2
 name: yubel
 description: Cloud-native, multi-target DAST orchestrator (Job/CronJob)
 type: application
-version: 0.2.1
+version: 0.3.0
 # Tracks the Yubel release this chart is written against.
-appVersion: "0.8.1"
+appVersion: "0.9.0"
 home: https://github.com/ggeorgeazevedo/yubel
 sources:
   - https://github.com/ggeorgeazevedo/yubel
