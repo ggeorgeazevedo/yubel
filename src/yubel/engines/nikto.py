@@ -48,7 +48,7 @@ class NiktoEngine(Engine):
                 engine=self.name,
                 target=target.label,
                 description=v.get("msg", ""),
-                location=v.get("url", target.endpoint()),
+                location=(v.get("url") or target.endpoint()),
                 references=[f"https://cve.mitre.org/cgi-bin/cvename.cgi?name={v['references']}"]
                     if v.get("references") else [],
                 raw={"id": v.get("id"), "method": v.get("method"), "osvdb": v.get("OSVDB")},

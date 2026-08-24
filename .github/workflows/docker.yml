@@ -78,6 +78,22 @@ jobs:
             selftest -o /out
           test -s "${GITHUB_WORKSPACE}/smoke/yubel.sarif"
 
+      # The gate above builds amd64 only, because a multi-platform build cannot
+      # be `--load`ed into the daemon for the smoke test. That left a hole the
+      # size of an architecture: `go install` refuses GOBIN while
+      # cross-compiling, so the arm64 leg failed on every push to main while
+      # every PR was green. Whatever only breaks under cross-compilation has to
+      # be built where it can break, and that has to happen before the merge.
+      - name: Build every published architecture (PRs)
+        if: github.event_name == 'pull_request'
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
       - name: Build multi-arch and push (main/tags)
         if: github.event_name == 'push'
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0

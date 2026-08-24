@@ -68,7 +68,7 @@ class WapitiEngine(Engine):
                     engine=self.name,
                     target=target.label,
                     description=classifications.get(category, {}).get("desc", ""),
-                    location=it.get("path", target.endpoint()),
+                    location=(it.get("path") or target.endpoint()),
                     evidence=it.get("parameter", "") or it.get("info", ""),
                     cwe=_CWE.get(category),
                     references=list(classifications.get(category, {}).get("ref", {}).values()),

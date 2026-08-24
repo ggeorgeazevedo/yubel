@@ -7,5 +7,5 @@ config, normalizes their findings into one model, and runs anywhere:
 a laptop, a Docker container, a Kubernetes Job, or a CI pipeline.
 """
 
-__version__ = "0.7.2"
+__version__ = "0.8.0"
 __all__ = ["__version__"]

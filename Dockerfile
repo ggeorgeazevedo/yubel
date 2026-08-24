@@ -36,6 +36,13 @@ ARG ZAP_VERSION=2.17.0
 ARG NIKTO_VERSION=2.6.1
 ARG TESTSSL_VERSION=v3.2.4
 ARG GRAPHQL_COP_VERSION=1.16
+# schemathesis 4.x is a different CLI: `--hypothesis-max-examples` became
+# `-n`, `--base-url` became `-u`, and `--report json` no longer exists.
+# The adapter speaks 3.x and reports itself unavailable on 4.x, so the
+# image pins the line it can actually drive.
+ARG SCHEMATHESIS_VERSION=3.39.16
+ARG GRAPHW00F_VERSION=0.0.1
+ARG KUBE_HUNTER_VERSION=0.6.8
 
 # ---- stage 1: Go-based ProjectDiscovery + XSS tooling ----------------------
 # --platform=$BUILDPLATFORM keeps this stage on the *builder's* architecture
@@ -48,15 +55,22 @@ ARG NUCLEI_VERSION
 ARG HTTPX_VERSION
 ARG KATANA_VERSION
 ARG DALFOX_VERSION
-ENV GOBIN=/gobin CGO_ENABLED=0 GOTOOLCHAIN=auto GOOS=linux
+# GOBIN is deliberately NOT set. `go install` refuses to honour it while
+# cross-compiling — "cannot install cross-compiled binaries when GOBIN is set" —
+# so with GOBIN this stage built fine for amd64 and failed for every other
+# architecture. Without it, native builds land in $GOPATH/bin and cross builds
+# in $GOPATH/bin/${GOOS}_${GOARCH}; the `find` below collects either shape.
+ENV CGO_ENABLED=0 GOTOOLCHAIN=auto GOOS=linux
 RUN set -eux; \
     export GOARCH="${TARGETARCH}"; \
-    mkdir -p /gobin; \
     go install "github.com/projectdiscovery/nuclei/v3/cmd/nuclei@${NUCLEI_VERSION}"; \
     go install "github.com/projectdiscovery/httpx/cmd/httpx@${HTTPX_VERSION}"; \
     go install "github.com/projectdiscovery/katana/cmd/katana@${KATANA_VERSION}"; \
     go install "github.com/hahwul/dalfox/v2@${DALFOX_VERSION}"; \
-    ls -1 /gobin
+    mkdir -p /gobin; \
+    find "$(go env GOPATH)/bin" -type f -exec mv {} /gobin/ \; ; \
+    ls -1 /gobin; \
+    for b in nuclei httpx katana dalfox; do test -x "/gobin/$b"; done
 
 # A git tag is not a Go module version, and this is where that bites.
 # dalfox v3.0.0 is a complete rewrite in Rust: those tags carry no `go.mod` at
@@ -144,17 +158,24 @@ RUN set -eux; \
         https://github.com/dolevf/graphql-cop.git /opt/graphql-cop; \
     chmod +x /opt/graphql-cop/graphql-cop.py; \
     ln -s /opt/graphql-cop/graphql-cop.py /usr/local/bin/graphql-cop; \
-    pip install --no-cache-dir requests simplejson termcolor PySocks; \
+    pip install --no-cache-dir 'requests==2.34.2' 'simplejson==4.1.1' \
+        'termcolor==3.3.0' 'PySocks==1.7.1'; \
     graphql-cop --version
 
 # Python-based engines.
 # NB: netifaces (a kube-hunter dependency) is a C extension with no prebuilt
 # wheel for Python 3.12, so it must be compiled. build-essential is installed
 # only for the build and purged in the same layer to keep the image slim.
+ARG SCHEMATHESIS_VERSION
+ARG GRAPHW00F_VERSION
+ARG KUBE_HUNTER_VERSION
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends build-essential; \
-    pip install --no-cache-dir schemathesis graphw00f kube-hunter; \
+    pip install --no-cache-dir \
+        "schemathesis==${SCHEMATHESIS_VERSION}" \
+        "graphw00f==${GRAPHW00F_VERSION}" \
+        "kube-hunter==${KUBE_HUNTER_VERSION}"; \
     apt-get purge -y build-essential; \
     apt-get autoremove -y; \
     rm -rf /var/lib/apt/lists/*

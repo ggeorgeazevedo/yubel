@@ -207,7 +207,12 @@ class NucleiEngine(Engine):
             except json.JSONDecodeError:
                 continue
             info = ev.get("info", {})
-            matched = ev.get("matched-at", ev.get("host", ""))
+            # `.get(k, default)` returns "" when the key is present and
+            # empty, so the host fallback never fired; and neither branch
+            # ended at the target, so a finding could be born with no
+            # address at all.
+            matched = (ev.get("matched-at") or ev.get("host")
+                       or target.endpoint())
             findings.append(Finding(
                 title=info.get("name", ev.get("template-id", "Nuclei finding")),
                 severity=info.get("severity", "info"),

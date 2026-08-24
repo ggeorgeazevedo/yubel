@@ -19,7 +19,11 @@ import pytest
 import yaml   # a hard dependency of the package, so never conditionally skipped
 
 ROOT = Path(__file__).resolve().parent.parent
-WORKFLOWS = sorted((ROOT / ".github" / "workflows").glob("*.yml"))
+#: `action.yml` is included deliberately: it is the file the Marketplace
+#: runs inside a consumer's repository, and it was the one place still on a
+#: mutable tag — the front door left unlocked while every window was barred.
+WORKFLOWS = sorted((ROOT / ".github" / "workflows").glob("*.yml")) + \
+    [ROOT / "action.yml"]
 
 #: `owner/repo/subpath@<40 hex>`, optionally followed by a version comment.
 _PINNED = re.compile(r"^[\w.-]+/[\w./-]+@[0-9a-f]{40}$")
@@ -151,3 +155,67 @@ def test_every_run_body_is_valid_shell():
         if done.returncode != 0:
             failures.append(f"{block[0].strip()[:50]}: {done.stderr.strip()}")
     assert not failures, "\n".join(failures)
+
+
+# --------------------------------------------------------------------------
+# One version, and a changelog that resolves
+# --------------------------------------------------------------------------
+
+VERSION = re.compile(r'(?:^version|__version__)\s*=\s*"([^"]+)"', re.M)
+
+
+def _declared_versions():
+    """Every place the project's own version is written down."""
+    found = {}
+    for path in ("pyproject.toml", "src/yubel/__init__.py"):
+        match = VERSION.search((ROOT / path).read_text(encoding="utf-8"))
+        assert match, f"no version found in {path}"
+        found[path] = match.group(1)
+    chart = yaml.safe_load(
+        (ROOT / "deploy" / "helm" / "yubel" / "Chart.yaml").read_text(encoding="utf-8"))
+    found["deploy/helm/yubel/Chart.yaml (appVersion)"] = str(chart["appVersion"])
+    return found
+
+
+def test_every_declared_version_agrees():
+    """Nothing kept `pyproject.toml`, `__init__.py` and the chart in step.
+
+    They happened to match; the chart did not, and sat four minor releases
+    behind at 0.1.0 while claiming to track the app.
+    """
+    versions = _declared_versions()
+    assert len(set(versions.values())) == 1, versions
+
+
+def test_the_changelog_has_a_section_for_the_current_version():
+    text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    version = _declared_versions()["pyproject.toml"]
+    assert re.search(rf"^## \[{re.escape(version)}\]", text, re.M), (
+        f"CHANGELOG has no `## [{version}]` section — bump one and not the "
+        f"other and the release notes describe the wrong code")
+
+
+def test_every_changelog_section_resolves_to_a_link():
+    """`[Unreleased]` had no definition at all, so it rendered as a dangling
+    reference on GitHub — the one heading a reader clicks first."""
+    text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    headings = set(re.findall(r"^## \[([^\]]+)\]", text, re.M))
+    links = set(re.findall(r"^\[([^\]]+)\]:", text, re.M))
+    assert not headings - links, f"sections with no link: {sorted(headings - links)}"
+    assert not links - headings, f"links with no section: {sorted(links - headings)}"
+
+
+def test_no_release_section_repeats_a_heading():
+    """Keep a Changelog expects one `### Fixed` per release. `[Unreleased]`
+    had eight, so anything grouping by heading produced eight sections."""
+    text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    blocks = re.split(r"^## \[", text, flags=re.M)[1:]
+    offenders = []
+    for block in blocks:
+        name = block.split("]", 1)[0]
+        headings = re.findall(r"^### (.+)$", block, re.M)
+        for heading in set(headings):
+            if headings.count(heading) > 1:
+                offenders.append(f"[{name}] has {headings.count(heading)}x "
+                                 f"'### {heading}'")
+    assert not offenders, "; ".join(offenders)

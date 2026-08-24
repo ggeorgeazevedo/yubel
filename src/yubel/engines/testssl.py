@@ -102,7 +102,7 @@ class TestSSLEngine(Engine):
                 engine=self.name,
                 target=target.label,
                 description=r.get("finding", ""),
-                location=r.get("ip", self._hostport(target)),
+                location=(r.get("ip") or self._hostport(target)),
                 cve=r.get("cve") or None,
                 cwe=r.get("cwe", "").replace("CWE-", "") or None,
                 raw={"id": r.get("id")},

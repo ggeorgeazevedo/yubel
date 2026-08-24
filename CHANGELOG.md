@@ -6,7 +6,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow
 
 ## [Unreleased]
 
-### Security — ZAP attacked the target by default while the docs promised passive
+## [0.8.0] — 2026-08-23
+
+### Security
+
+**ZAP attacked the target by default while the docs promised passive**
+
 `_web_scripts()` keyed off `mode == "baseline"` and let everything else — *including
 unset* — fall through to `zap-full-scan.py`, which actively attacks. Both
 `docs/engines.md` and SECURITY.md's "Safe defaults" section said the default was
@@ -21,7 +26,8 @@ error instead of a silent fallback to the default, via a new `Engine.option_erro
 hook: unknown option *keys* were already rejected, and a known key holding a value no
 adapter understands is that same failure one level down.
 
-### Security — three controls that were documented but not there
+**Three controls that were documented but not there**
+
 - **`SECURITY.md` told the reader to bound a scan with `scope`/`exclude`.** Those
   fields are parsed into `Target` and read by no engine, so a config that sets them
   is not scoped in any way — under a heading called "Safe defaults", in the file a
@@ -42,99 +48,8 @@ adapter understands is that same failure one level down.
   equivalent. `tests/test_shipped_configs.py` now asserts the two mount the same
   paths, so they cannot drift apart again.
 
-### Fixed — four defaults in the generated engine reference were wrong
-`scripts/gen_engines.py` verifies that every option *has* a description; nothing
-verified the description was *true*. `zap.mode` claimed the default was passive
-(it was active), `nuclei.severity` claimed `all` (it is `low,medium,high,critical`
-— `info` is dropped), `nikto.maxtime` claimed no cap (it is always 600s), and
-`schemathesis.examples` claimed a boolean (it is a count, default 50 — setting it
-to `true` sends `--hypothesis-max-examples True`, which schemathesis rejects).
+**The release pipeline could publish a wheel nobody committed**
 
-### Added — the configs and manifests this project ships are now tested
-`tests/test_shipped_configs.py` loads `examples/yubel.yaml`, the Kubernetes
-ConfigMap and the Helm values, and asserts each validates, that no URL-needing
-engine is routed at a target with no endpoint, that `yubel init`'s output and the
-committed example still agree, and that every manifest with a read-only root mounts
-the paths its tools write to. Each fix above was verified by sabotage.
-
-### Fixed — the published container image shipped 11 of the 13 engines it advertised
-Running the image and asking it showed `zap: no` and `graphql-cop: no`. Nothing
-in the build or the release pipeline had ever asked, so it went out that way.
-Both causes are the failure shape this project keeps finding: a scan that
-reports normally without having run.
-
-- **ZAP was fetched from a URL that could only ever break.** The build asked
-  GitHub for `releases/latest/download/ZAP_2.16.1_Linux.tar.gz` — a pinned
-  *filename* under a floating `latest/` path — so it 404'd the day upstream cut
-  2.17.0. Pinning half a URL is worse than pinning none of it, because it looks
-  pinned. Two things then hid the failure: `curl -sSL` has no `-f`, so curl
-  exits **0** on a 404 and writes the error page to the output file; and the
-  whole `&&` chain ended in `|| true`, which swallows a failure of *any*
-  command in it, not just the last. Both verified locally against a 404 before
-  changing anything.
-- **`pip install graphql-cop` installs a placeholder.** The PyPI project of
-  that name is version 0.0.1 and its own summary reads "Reserved name
-  placeholder. No functionality." It installs cleanly and provides no binary.
-  The real tool is `github.com/dolevf/graphql-cop`, now cloned at a pinned tag.
-  Its `requirements.txt` pins `requests==2.25.1`, which would drag schemathesis
-  down with it, so its dependencies are installed unpinned instead.
-- **Every version in the image is now an ARG** — Go tools, ZAP, nikto,
-  testssl.sh, graphql-cop, and both base images — so a bump is a visible,
-  reviewable change instead of whatever upstream published that morning. Every
-  `RUN` starts with `set -eux` and every download uses `curl -f`.
-- **The build now asks the image what it shipped.** New `yubel engines --check`
-  exits non-zero if any non-opt-in engine is missing; the Dockerfile runs it as
-  a build step, so this class of gap fails the build. Intrusive opt-in engines
-  (`sqlmap`) are deliberately exempt.
-- **The Docker workflow's smoke test never ran.** It was guarded by
-  `if: github.event_name == 'pull_request'` in a workflow that does not trigger
-  on `pull_request` — so the image was pushed to ghcr.io with nothing verifying
-  it. The workflow now builds on PRs that touch the image (path-scoped, so
-  Dependabot noise stays away), loads a single-arch image, and runs both
-  `engines --check` and a full `selftest` against it before any push.
-- **The image is now `linux/amd64` *and* `linux/arm64`.** It was amd64-only, so
-  Apple Silicon needed `--platform linux/amd64` and ran under emulation. The Go
-  stage builds on the host architecture and cross-compiles via `GOARCH`, so the
-  second architecture costs minutes rather than most of an hour.
-
-### Fixed — nuclei ran without the templates the image ships
-`nuclei -update-templates` ran as root, *before* `useradd`, so the templates
-landed in root's home. The runtime process is uid 10001 with
-`HOME=/home/yubel` and never found them: every scan re-downloaded them inside
-the user's network — the exact outbound call baking them in was meant to
-avoid — and the image carried a copy nothing used.
-
-On the Kubernetes Job in `deploy/k8s/`, which sets `readOnlyRootFilesystem:
-true` with an emptyDir on only `/out` and `/tmp`, that download cannot succeed
-at all. So in the deployment this project documents, the engine that produces
-most of the findings was running degraded, and nothing said so.
-
-- Templates are installed to `/opt/nuclei-templates` and made world-readable;
-  `NUCLEI_TEMPLATES_DIR` points both the build step and every later run at it.
-  `NUCLEI_CONFIG_DIR` moves to `/tmp`, which stays writable — nuclei writes
-  `.templates-config.json` on startup and would otherwise fail on a read-only
-  root.
-- The adapter passes `-duc` whenever the templates were pre-provisioned, so a
-  baked read-only directory is never updated mid-scan. `--offline` still sends
-  both `-ni` and `-duc`; it is the stronger promise and is unchanged.
-- The build now counts the templates, and then **re-checks as uid 10001** —
-  `yubel engines --check` and `nuclei -tl` both run as the runtime user. "Root
-  can read it" was never the question, and that is precisely what the old
-  build verified.
-- `deploy/k8s/job.yaml` mounts an emptyDir on `/home/yubel` as a backstop for
-  any tool that insists on writing under `$HOME`.
-- nuclei's config directory is per-run state, not image content: the build
-  removes what it wrote there as root, and each run recreates it under its own
-  uid. Leaving a root-owned `.templates-config.json` behind is what the first
-  attempt at this fix did, and the new uid-10001 check is what caught it.
-- `tests/test_workflows.py` now shell-lints every `RUN` in the Dockerfile with
-  `sh -n`, and rejects a `#` comment inside a `RUN` continuation — whether
-  such a line is stripped by the Dockerfile frontend or passed to the shell
-  (where it comments out the rest of that line) depends on the builder. Both
-  cases verified by sabotage. These are the mistakes that otherwise surface
-  only after a ten-minute image build.
-
-### Security — the release pipeline could publish a wheel nobody committed
 - **`pypa/gh-action-pypi-publish` was referenced by `release/v1` — a branch.**
   It runs in the one job holding `id-token: write` and the PyPI Trusted
   Publisher, so anything pushed to that branch could mint the OIDC token and
@@ -157,47 +72,32 @@ most of the findings was running degraded, and nothing said so.
   `build` job's permissions removed, or the build tools unpinned. Pinning only
   holds if un-pinning breaks something; both cases verified by sabotage.
 
-### Fixed — dalfox 3.x was invoked with flags it does not have
-dalfox 3.0 is a complete rewrite **in Rust**, not a Go release: its tags carry
-no `go.mod`, which is why pinning the image to `dalfox/v2@v3.2.1` failed the
-build outright with *"does not contain package .../v2"*. The image is pinned to
-`v2.13.0`, the last Go release — and exactly what the old `@latest` on the
-`/v2` module path was already resolving to, so the shipped binary does not
-change. Moving to v3 needs a Rust toolchain in the image and is deliberately a
-separate change.
+### Added
 
-The adapter's own v3 branch was wrong too, and a test was locking it in: it
-sent `dalfox url --url <URL> --header ...`, and v3 has no `--url` flag (the URL
-is positional) and spells the header flag `--headers`/`-H`. Homebrew ships v3,
-so anyone who installed dalfox that way had the engine failing on every run.
-Both lines take a positional URL and `-H "Name: value"`, so the only real
-difference left is the subcommand: `url` on 2.x, `scan` on 3.x.
+**The configs and manifests this project ships are now tested**
 
-### Fixed — a test was reporting on the developer's laptop, not on the code
-`test_dalfox_command_targets_given_url` asserted the `url` subcommand against
-whatever dalfox happened to be on PATH. It passed in CI and in any container
-with no dalfox installed — the version probe falls back to major 2 when the
-binary is missing — and failed on a machine with the Homebrew build, which is
-the 3.x Rust line. A new `tests/conftest.py` pins the probe for the whole
-suite, so a test that cares about the version has to say which one it means.
-Verified by running the suite twice: once with every engine faked onto PATH
-reporting 3.x, once with a bare PATH. Same result.
+`tests/test_shipped_configs.py` loads `examples/yubel.yaml`, the Kubernetes
+ConfigMap and the Helm values, and asserts each validates, that no URL-needing
+engine is routed at a target with no endpoint, that `yubel init`'s output and the
+committed example still agree, and that every manifest with a read-only root mounts
+the paths its tools write to. Each fix above was verified by sabotage.
 
-### Fixed — credentials silently dropped for graphql-cop
-Introduced by the previous release's own auth work, and the same shape it was
-written to eliminate. graphql-cop was given `header_flag = "-H"` and nothing
-else, so it received `Authorization: Bearer …`. It parses `-H` with
-`json.loads()` and wants `{"Authorization": "Bearer …"}`; its handler for a
-value it cannot parse is a bare `except:` that prints one line and **keeps
-scanning**. So the run did not fail — it dropped the credentials and reported
-an anonymous scan as a normal one.
-
-Adapters now declare `header_style` (`colon` or `json`) alongside `header_flag`,
-and a test asserts the spelling for every auth-capable engine. The other five
-were checked against their own `--help`: nuclei, wapiti, sqlmap, dalfox and
-schemathesis all take `Name: value`.
+- **`docs/engines.md`**, generated from the registry by `scripts/gen_engines.py`.
+  Eleven of the twenty-four `options` keys in use were documented nowhere a
+  user would read — including `timeout`, which applies to every engine, and
+  `keep_workdir`, the only way to inspect a failed engine's raw output. The
+  doc carries the engine table, target routing, per-engine options, top-level
+  config keys and the authentication matrix. `tests/test_engines_doc.py` fails
+  the build if the committed file drifts from the code, or if an engine reads
+  an option that has no description.
+- **`yubel engines` gained an `AUTH` column** and names, underneath the table,
+  the engines that scan anonymously. The auth gap is now stated rather than
+  left as an absence.
+- `NucleiEngine.passes()` is a documented public method — it was inline logic
+  inside `run()` that no test could reach.
 
 ### Changed
+
 - `docs/engines.md` now derives the top-level config defaults from `Config`
   itself. The hand-written table claimed `crawl_max_urls: 50` while the code
   said 150 — the exact drift the generator exists to prevent — and described
@@ -244,7 +144,157 @@ schemathesis all take `Name: value`.
   `--install` behaviour; a duplicate line claimed the Docker image twice. Added
   the Linux-without-Homebrew caveat, the sqlmap opt-in rule and the `grpc` gap.
 
-### Fixed — documentation that overstated what the tool does
+### Fixed
+
+**The arm64 image never built, and every pull request was green anyway**
+
+`go install` refuses to honour `GOBIN` while cross-compiling — *"cannot install
+cross-compiled binaries when GOBIN is set"* — so the Go stage worked for amd64
+and failed for every other architecture. The stage now leaves `GOBIN` unset and
+collects the binaries from wherever the toolchain put them (`$GOPATH/bin` when
+native, `$GOPATH/bin/${GOOS}_${GOARCH}` when cross), then asserts all four are
+present.
+
+The reason this reached `main` at all is the more useful half. The PR gate
+builds amd64 only, because a multi-platform build cannot be `--load`ed into the
+daemon for the smoke test — so the architecture that broke was the one never
+built before merging. The workflow now also builds every published architecture
+on pull requests, without pushing. A verification step that skips an
+architecture is not verifying the image, it is verifying half of it.
+
+**Four defaults in the generated engine reference were wrong**
+
+`scripts/gen_engines.py` verifies that every option *has* a description; nothing
+verified the description was *true*. `zap.mode` claimed the default was passive
+(it was active), `nuclei.severity` claimed `all` (it is `low,medium,high,critical`
+— `info` is dropped), `nikto.maxtime` claimed no cap (it is always 600s), and
+`schemathesis.examples` claimed a boolean (it is a count, default 50 — setting it
+to `true` sends `--hypothesis-max-examples True`, which schemathesis rejects).
+
+**The published container image shipped 11 of the 13 engines it advertised**
+
+Running the image and asking it showed `zap: no` and `graphql-cop: no`. Nothing
+in the build or the release pipeline had ever asked, so it went out that way.
+Both causes are the failure shape this project keeps finding: a scan that
+reports normally without having run.
+
+- **ZAP was fetched from a URL that could only ever break.** The build asked
+  GitHub for `releases/latest/download/ZAP_2.16.1_Linux.tar.gz` — a pinned
+  *filename* under a floating `latest/` path — so it 404'd the day upstream cut
+  2.17.0. Pinning half a URL is worse than pinning none of it, because it looks
+  pinned. Two things then hid the failure: `curl -sSL` has no `-f`, so curl
+  exits **0** on a 404 and writes the error page to the output file; and the
+  whole `&&` chain ended in `|| true`, which swallows a failure of *any*
+  command in it, not just the last. Both verified locally against a 404 before
+  changing anything.
+- **`pip install graphql-cop` installs a placeholder.** The PyPI project of
+  that name is version 0.0.1 and its own summary reads "Reserved name
+  placeholder. No functionality." It installs cleanly and provides no binary.
+  The real tool is `github.com/dolevf/graphql-cop`, now cloned at a pinned tag.
+  Its `requirements.txt` pins `requests==2.25.1`, which would drag schemathesis
+  down with it, so its dependencies are installed unpinned instead.
+- **Every version in the image is now an ARG** — Go tools, ZAP, nikto,
+  testssl.sh, graphql-cop, and both base images — so a bump is a visible,
+  reviewable change instead of whatever upstream published that morning. Every
+  `RUN` starts with `set -eux` and every download uses `curl -f`.
+- **The build now asks the image what it shipped.** New `yubel engines --check`
+  exits non-zero if any non-opt-in engine is missing; the Dockerfile runs it as
+  a build step, so this class of gap fails the build. Intrusive opt-in engines
+  (`sqlmap`) are deliberately exempt.
+- **The Docker workflow's smoke test never ran.** It was guarded by
+  `if: github.event_name == 'pull_request'` in a workflow that does not trigger
+  on `pull_request` — so the image was pushed to ghcr.io with nothing verifying
+  it. The workflow now builds on PRs that touch the image (path-scoped, so
+  Dependabot noise stays away), loads a single-arch image, and runs both
+  `engines --check` and a full `selftest` against it before any push.
+- **The image is now `linux/amd64` *and* `linux/arm64`.** It was amd64-only, so
+  Apple Silicon needed `--platform linux/amd64` and ran under emulation. The Go
+  stage builds on the host architecture and cross-compiles via `GOARCH`, so the
+  second architecture costs minutes rather than most of an hour.
+
+**Nuclei ran without the templates the image ships**
+
+`nuclei -update-templates` ran as root, *before* `useradd`, so the templates
+landed in root's home. The runtime process is uid 10001 with
+`HOME=/home/yubel` and never found them: every scan re-downloaded them inside
+the user's network — the exact outbound call baking them in was meant to
+avoid — and the image carried a copy nothing used.
+
+On the Kubernetes Job in `deploy/k8s/`, which sets `readOnlyRootFilesystem:
+true` with an emptyDir on only `/out` and `/tmp`, that download cannot succeed
+at all. So in the deployment this project documents, the engine that produces
+most of the findings was running degraded, and nothing said so.
+
+- Templates are installed to `/opt/nuclei-templates` and made world-readable;
+  `NUCLEI_TEMPLATES_DIR` points both the build step and every later run at it.
+  `NUCLEI_CONFIG_DIR` moves to `/tmp`, which stays writable — nuclei writes
+  `.templates-config.json` on startup and would otherwise fail on a read-only
+  root.
+- The adapter passes `-duc` whenever the templates were pre-provisioned, so a
+  baked read-only directory is never updated mid-scan. `--offline` still sends
+  both `-ni` and `-duc`; it is the stronger promise and is unchanged.
+- The build now counts the templates, and then **re-checks as uid 10001** —
+  `yubel engines --check` and `nuclei -tl` both run as the runtime user. "Root
+  can read it" was never the question, and that is precisely what the old
+  build verified.
+- `deploy/k8s/job.yaml` mounts an emptyDir on `/home/yubel` as a backstop for
+  any tool that insists on writing under `$HOME`.
+- nuclei's config directory is per-run state, not image content: the build
+  removes what it wrote there as root, and each run recreates it under its own
+  uid. Leaving a root-owned `.templates-config.json` behind is what the first
+  attempt at this fix did, and the new uid-10001 check is what caught it.
+- `tests/test_workflows.py` now shell-lints every `RUN` in the Dockerfile with
+  `sh -n`, and rejects a `#` comment inside a `RUN` continuation — whether
+  such a line is stripped by the Dockerfile frontend or passed to the shell
+  (where it comments out the rest of that line) depends on the builder. Both
+  cases verified by sabotage. These are the mistakes that otherwise surface
+  only after a ten-minute image build.
+
+**Dalfox 3.x was invoked with flags it does not have**
+
+dalfox 3.0 is a complete rewrite **in Rust**, not a Go release: its tags carry
+no `go.mod`, which is why pinning the image to `dalfox/v2@v3.2.1` failed the
+build outright with *"does not contain package .../v2"*. The image is pinned to
+`v2.13.0`, the last Go release — and exactly what the old `@latest` on the
+`/v2` module path was already resolving to, so the shipped binary does not
+change. Moving to v3 needs a Rust toolchain in the image and is deliberately a
+separate change.
+
+The adapter's own v3 branch was wrong too, and a test was locking it in: it
+sent `dalfox url --url <URL> --header ...`, and v3 has no `--url` flag (the URL
+is positional) and spells the header flag `--headers`/`-H`. Homebrew ships v3,
+so anyone who installed dalfox that way had the engine failing on every run.
+Both lines take a positional URL and `-H "Name: value"`, so the only real
+difference left is the subcommand: `url` on 2.x, `scan` on 3.x.
+
+**A test was reporting on the developer's laptop, not on the code**
+
+`test_dalfox_command_targets_given_url` asserted the `url` subcommand against
+whatever dalfox happened to be on PATH. It passed in CI and in any container
+with no dalfox installed — the version probe falls back to major 2 when the
+binary is missing — and failed on a machine with the Homebrew build, which is
+the 3.x Rust line. A new `tests/conftest.py` pins the probe for the whole
+suite, so a test that cares about the version has to say which one it means.
+Verified by running the suite twice: once with every engine faked onto PATH
+reporting 3.x, once with a bare PATH. Same result.
+
+**Credentials silently dropped for graphql-cop**
+
+Introduced by the previous release's own auth work, and the same shape it was
+written to eliminate. graphql-cop was given `header_flag = "-H"` and nothing
+else, so it received `Authorization: Bearer …`. It parses `-H` with
+`json.loads()` and wants `{"Authorization": "Bearer …"}`; its handler for a
+value it cannot parse is a bare `except:` that prints one line and **keeps
+scanning**. So the run did not fail — it dropped the credentials and reported
+an anonymous scan as a normal one.
+
+Adapters now declare `header_style` (`colon` or `json`) alongside `header_flag`,
+and a test asserts the spelling for every auth-capable engine. The other five
+were checked against their own `--help`: nuclei, wapiti, sqlmap, dalfox and
+schemathesis all take `Name: value`.
+
+**Documentation that overstated what the tool does**
+
 An audit of every doc against the source turned up statements that would
 mislead a reader about **security coverage**, which is the only kind of doc bug
 that can cost someone a finding.
@@ -286,9 +336,7 @@ that can cost someone a finding.
 - The README release example tagged `v0.3.0`, four releases behind, and its
   engine list omitted `httpx` and `graphw00f`.
 
-
-### Fixed
-Five paths where the scan reported "no findings", exit 0 and no warning, for a
+Seven paths where the scan reported "no findings", exit 0 and no warning, for a
 scan that had not actually happened. Each one is covered by a test in
 `tests/test_silent_failures.py` that fails on 0.7.2.
 
@@ -334,22 +382,8 @@ scan that had not actually happened. Each one is covered by a test in
   can scan — which also catches the same hole reached through configuration,
   e.g. every engine disabled.
 
-### Added
-- **`docs/engines.md`**, generated from the registry by `scripts/gen_engines.py`.
-  Eleven of the twenty-four `options` keys in use were documented nowhere a
-  user would read — including `timeout`, which applies to every engine, and
-  `keep_workdir`, the only way to inspect a failed engine's raw output. The
-  doc carries the engine table, target routing, per-engine options, top-level
-  config keys and the authentication matrix. `tests/test_engines_doc.py` fails
-  the build if the committed file drifts from the code, or if an engine reads
-  an option that has no description.
-- **`yubel engines` gained an `AUTH` column** and names, underneath the table,
-  the engines that scan anonymously. The auth gap is now stated rather than
-  left as an absence.
-- `NucleiEngine.passes()` is a documented public method — it was inline logic
-  inside `run()` that no test could reach.
+**Tests**
 
-### Fixed (tests)
 Four tests passed without exercising the code they named. Each was verified by
 sabotage — breaking the production path and confirming the test now fails.
 - `test_crawl.py` asserted on a hand-rolled copy of the crawl guard; it now
@@ -706,6 +740,8 @@ Initial public release.
   **382-tool DAST landscape** (`docs/LANDSCAPE.md` + `data/dast-landscape.csv`).
 - **Tests**: full pipeline coverage without network or external binaries.
 
+[Unreleased]: https://github.com/ggeorgeazevedo/yubel/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.8.0
 [0.7.2]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.7.2
 [0.7.1]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.7.1
 [0.7.0]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.7.0
