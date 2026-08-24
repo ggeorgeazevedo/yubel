@@ -12,7 +12,10 @@ data:
       - name: shop
         type: web
         url: http://shop.default.svc.cluster.local
-      # dynamic pentest of the cluster itself from inside a pod
+      # Dynamic pentest of the cluster itself, from inside a pod.
+      # kube-hunter needs no URL. nuclei covers a cluster only *via its
+      # ingress*, so give this target a `url:` if you want nuclei here —
+      # without one it is skipped rather than run against an empty target.
       - name: this-cluster
         type: kubernetes
         k8s_mode: pod

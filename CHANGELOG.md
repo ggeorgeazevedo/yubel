@@ -6,6 +6,57 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow
 
 ## [Unreleased]
 
+### Security — ZAP attacked the target by default while the docs promised passive
+`_web_scripts()` keyed off `mode == "baseline"` and let everything else — *including
+unset* — fall through to `zap-full-scan.py`, which actively attacks. Both
+`docs/engines.md` and SECURITY.md's "Safe defaults" section said the default was
+the passive baseline scan. So an operator following the documentation and pointing
+Yubel at production on defaults attacked it.
+
+The code moved rather than the promise: **`baseline` is now the default**, and it is
+the passive spider. `mode: full` selects the active scan and, deliberately, does not
+fall back to the passive one — asking for an active scan and silently getting a
+passive one is the same lie in the other direction. Any other value is now a config
+error instead of a silent fallback to the default, via a new `Engine.option_errors()`
+hook: unknown option *keys* were already rejected, and a known key holding a value no
+adapter understands is that same failure one level down.
+
+### Security — three controls that were documented but not there
+- **`SECURITY.md` told the reader to bound a scan with `scope`/`exclude`.** Those
+  fields are parsed into `Target` and read by no engine, so a config that sets them
+  is not scoped in any way — under a heading called "Safe defaults", in the file a
+  reader consults precisely to find out what is safe. `docs/engines.md` had already
+  been corrected; SECURITY.md had not. It now says plainly that they are not
+  implemented, and says what to do instead.
+- **The Kubernetes Job this project ships ran `nuclei -u ''` on every scan.** Its
+  `kubernetes` target has no URL — correct for kube-hunter, which reaches a cluster
+  without one — and `Config.validate()` exempts kubernetes from the endpoint check
+  for exactly that reason. But `handles()` looked only at the target type, so nuclei
+  was selected, invoked against an empty string, and recorded `ok` with no findings.
+  nuclei covers a cluster *via its ingress*, so it now requires an endpoint; with
+  none, it is skipped, which is visible in the run table.
+- **The Helm chart never got the `/home/yubel` emptyDir** that `deploy/k8s/job.yaml`
+  received with the nuclei-templates fix, while setting the identical
+  `readOnlyRootFilesystem: true` — so a `helm install` still hit the failure the raw
+  manifest had just been fixed for, with the README advertising both paths as
+  equivalent. `tests/test_shipped_configs.py` now asserts the two mount the same
+  paths, so they cannot drift apart again.
+
+### Fixed — four defaults in the generated engine reference were wrong
+`scripts/gen_engines.py` verifies that every option *has* a description; nothing
+verified the description was *true*. `zap.mode` claimed the default was passive
+(it was active), `nuclei.severity` claimed `all` (it is `low,medium,high,critical`
+— `info` is dropped), `nikto.maxtime` claimed no cap (it is always 600s), and
+`schemathesis.examples` claimed a boolean (it is a count, default 50 — setting it
+to `true` sends `--hypothesis-max-examples True`, which schemathesis rejects).
+
+### Added — the configs and manifests this project ships are now tested
+`tests/test_shipped_configs.py` loads `examples/yubel.yaml`, the Kubernetes
+ConfigMap and the Helm values, and asserts each validates, that no URL-needing
+engine is routed at a target with no endpoint, that `yubel init`'s output and the
+committed example still agree, and that every manifest with a read-only root mounts
+the paths its tools write to. Each fix above was verified by sabotage.
+
 ### Fixed — the published container image shipped 11 of the 13 engines it advertised
 Running the image and asking it showed `zap: no` and `graphql-cop: no`. Nothing
 in the build or the release pipeline had ever asked, so it went out that way.

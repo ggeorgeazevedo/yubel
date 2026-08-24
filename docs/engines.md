@@ -66,7 +66,7 @@ A target type with no engine is a config error, not an empty report.
 |---|---|---|
 | `ajax` | false | Enable the AJAX spider for JS-heavy apps. |
 | `api_format` | openapi | Spec format for `zap-api-scan.py`. |
-| `mode` | baseline | `baseline` (passive) or `full` (active scan). |
+| `mode` | baseline | `baseline` runs ZAP's passive spider and is the default; `full` runs `zap-full-scan.py`, which **actively attacks** the target. Any other value is a config error rather than a silent fallback. |
 
 ### `nuclei`
 
@@ -77,7 +77,7 @@ A target type with no engine is a config error, not an empty report.
 | `full` | true | Run the full-template pass. |
 | `offline` | false | Air-gapped mode: no OAST/interactsh, no template update check. |
 | `rate_limit` | nuclei's default | Requests per second cap (`-rl`). |
-| `severity` | all | Comma-separated nuclei severities to keep. |
+| `severity` | low,medium,high,critical | Comma-separated nuclei severities to keep. Note that `info` is **not** included by default — pass `info,low,medium,high,critical` to keep it. |
 
 ### `wapiti`
 
@@ -90,7 +90,7 @@ A target type with no engine is a config error, not an empty report.
 
 | Key | Default | What it does |
 |---|---|---|
-| `maxtime` | — | Wall-clock cap in seconds passed to nikto itself. |
+| `maxtime` | 600 | Wall-clock cap in seconds passed to nikto itself. Always sent; set it to 0 to drop the cap. |
 | `tuning` | — | Nikto tuning string, e.g. `x6` to skip DoS checks. |
 
 ### `dalfox`
@@ -118,7 +118,7 @@ A target type with no engine is a config error, not an empty report.
 | Key | Default | What it does |
 |---|---|---|
 | `base_url` | target's url | Override the base URL the spec is tested against. |
-| `examples` | true | Use the spec's examples as test data. |
+| `examples` | 50 | How many test cases schemathesis generates per operation (`--hypothesis-max-examples`). It is a count, not a switch. |
 
 ### `kube-hunter`
 

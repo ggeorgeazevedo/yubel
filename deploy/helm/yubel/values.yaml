@@ -22,6 +22,9 @@ config:
     - name: app
       type: web
       url: http://app.default.svc.cluster.local
+    # kube-hunter needs no URL; nuclei covers a cluster only via its ingress,
+    # so add `url:` here if you want nuclei on this target. Without one it is
+    # skipped rather than run against an empty target.
     - name: cluster
       type: kubernetes
       k8s_mode: pod

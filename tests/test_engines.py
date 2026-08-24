@@ -222,3 +222,68 @@ def test_offline_still_disables_interactsh_as_well(monkeypatch, tmp_path):
     cmd = NucleiEngine({"offline": True}).build_command(
         Target(type=TargetType.WEB, url="https://app.example.com"), str(tmp_path))
     assert "-ni" in cmd and "-duc" in cmd
+
+
+# --------------------------------------------------------------------------
+# ZAP: the default must be the passive scan
+# --------------------------------------------------------------------------
+
+def test_zap_defaults_to_the_passive_baseline_scan():
+    """The default used to be `zap-full-scan.py`, which actively attacks.
+
+    `_web_scripts()` keyed off `mode == "baseline"` and let everything else —
+    including *unset* — fall through to the full scan, while `docs/engines.md`
+    and SECURITY.md's "safe defaults" both promised passive. Pointing Yubel at
+    production on defaults attacked it.
+    """
+    from yubel.engines.zap import ZapEngine
+
+    assert ZapEngine()._web_scripts()[0] == "zap-baseline.py"
+    assert ZapEngine({"mode": "baseline"})._web_scripts()[0] == "zap-baseline.py"
+
+
+def test_zap_full_mode_is_the_active_scan_and_never_degrades_to_passive():
+    """Asking for an active scan and silently getting a passive one is the
+    same class of lie in the other direction, so `full` has no fallback."""
+    from yubel.engines.zap import ZapEngine
+
+    scripts = ZapEngine({"mode": "full"})._web_scripts()
+    assert scripts == ("zap-full-scan.py",)
+    assert "zap-baseline.py" not in scripts
+
+
+@pytest.mark.parametrize("mode", ["FULL", " full ", "Baseline"])
+def test_zap_mode_is_read_case_and_space_insensitively(mode):
+    from yubel.engines.zap import ZapEngine
+
+    assert ZapEngine({"mode": mode})._web_scripts()[0].startswith("zap-")
+    assert ZapEngine.option_errors({"mode": mode}) == []
+
+
+def test_zap_still_probes_every_script_for_availability():
+    """`available()` must not narrow with `mode`, or a baseline-configured run
+    on a full-scan-only install would report the engine as missing."""
+    from yubel.engines.zap import ZapEngine
+
+    assert set(ZapEngine.WEB_SCRIPTS) == {"zap-baseline.py", "zap-full-scan.py"}
+
+
+# --------------------------------------------------------------------------
+# nuclei needs somewhere to point
+# --------------------------------------------------------------------------
+
+def test_nuclei_skips_a_target_that_has_no_endpoint():
+    """`kubernetes` targets are exempt from the endpoint check in validate()
+    because kube-hunter needs no URL. nuclei covers a cluster via its ingress,
+    so with no URL it has nothing to scan — and used to run `-u ''` anyway."""
+    from yubel.engines.nuclei import NucleiEngine
+
+    # exactly what deploy/k8s/configmap.yaml ships: a pod-mode cluster target
+    # with neither url nor host
+    cluster = Target(type=TargetType.KUBERNETES, k8s_mode="pod")
+    assert cluster.endpoint() == ""
+    assert NucleiEngine().handles(cluster) is False
+
+    with_ingress = Target(type=TargetType.KUBERNETES,
+                          url="https://ingress.example.com")
+    assert NucleiEngine().handles(with_ingress) is True

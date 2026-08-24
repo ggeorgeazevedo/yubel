@@ -13,7 +13,15 @@ Safe defaults:
   `--include-intrusive` or name them explicitly.
 - `kube-hunter` runs in passive mode; active exploitation requires
   `options.kube-hunter.active: true`.
-- Point scans at **staging** first. Scope with `scope`/`exclude` on each target.
+- Point scans at **staging** first.
+- ZAP runs its **passive** baseline scan by default. `options.zap.mode: full`
+  switches to `zap-full-scan.py`, which actively attacks the target — set it
+  deliberately, and only where you are authorised to.
+- **`scope` and `exclude` are not implemented.** They are accepted in a
+  target and read by no engine, so a config that sets them is not scoped in
+  any way. Do not rely on them to bound a scan; bound it by pointing Yubel
+  only at hosts you are authorised to test. Tracked in
+  [#18](https://github.com/ggeorgeazevedo/yubel/issues/18).
 
 ## Reporting a vulnerability in Yubel
 
