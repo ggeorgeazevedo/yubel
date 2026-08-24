@@ -79,7 +79,7 @@ class GraphqlCopEngine(Engine):
                 title=item.get("title", "GraphQL issue"),
                 severity=sev, engine=self.name, target=target.label,
                 description=item.get("description", ""),
-                location=item.get("curl_verify", target.endpoint()),
+                location=(item.get("curl_verify") or target.endpoint()),
                 remediation=item.get("remediation", ""),
                 confidence="medium",
             ))

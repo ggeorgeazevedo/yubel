@@ -112,7 +112,7 @@ class HttpxEngine(Engine):
                 engine=self.name,
                 target=target.label,
                 description=f"Server={o.get('webserver', '')}; Tech={tech}",
-                location=o.get("url", target.endpoint()),
+                location=(o.get("url") or target.endpoint()),
                 raw={"status": o.get("status_code"), "tech": o.get("tech")},
                 confidence="high",
             ))

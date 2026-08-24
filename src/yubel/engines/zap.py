@@ -116,8 +116,13 @@ class ZapEngine(Engine):
         findings: List[Finding] = []
         for site in data.get("site", []):
             for alert in site.get("alerts", []):
-                instances = alert.get("instances", [{}])
-                loc = instances[0].get("uri", site.get("@name", "")) if instances else ""
+                # `alert.get("instances", [{}])` returns [] when the key is
+                # present and empty, so the default never fires; and `.get(k, d)`
+                # keeps an empty `uri` for the same reason. Neither path ended
+                # at the target, so a ZAP finding could carry no address.
+                instances = alert.get("instances") or [{}]
+                loc = (instances[0].get("uri") or site.get("@name")
+                       or target.endpoint())
                 findings.append(Finding(
                     title=alert.get("alert", alert.get("name", "ZAP alert")),
                     severity=alert.get("riskcode", alert.get("riskdesc", "0")),
@@ -125,7 +130,7 @@ class ZapEngine(Engine):
                     target=target.label,
                     description=_strip_html(alert.get("desc", "")),
                     location=loc,
-                    evidence=instances[0].get("evidence", "") if instances else "",
+                    evidence=instances[0].get("evidence", ""),
                     cwe=str(alert.get("cweid")) if alert.get("cweid", "-1") not in ("-1", "") else None,
                     references=[r for r in _strip_html(alert.get("reference", "")).split("\n") if r],
                     confidence=_confidence(alert.get("confidence", "2")),

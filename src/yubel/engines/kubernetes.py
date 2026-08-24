@@ -65,7 +65,11 @@ class KubeHunterEngine(Engine):
                 engine=self.name,
                 target=target.label,
                 description=v.get("description", ""),
-                location=v.get("location", target.endpoint()),
+                # a cluster target legitimately has no URL, so the last
+                # resort is the label, which `Target.label` guarantees is
+                # never empty
+                location=(v.get("location") or target.endpoint()
+                          or target.label),
                 evidence=v.get("evidence", ""),
                 references=[v.get("avd_reference")] if v.get("avd_reference") else [],
                 raw={"category": v.get("category"), "hunter": v.get("hunter"),
