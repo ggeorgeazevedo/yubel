@@ -224,7 +224,18 @@ RUN pip install --no-cache-dir .
 
 # The build asks the image what it actually shipped. This is the step whose
 # absence let an image go out advertising thirteen engines with eleven in it.
-RUN yubel engines --check
+#
+# The cleanup is not decoration. `yubel engines` asks every tool for its
+# version, so this step *runs* nuclei — as root — and nuclei writes
+# `.templates-config.json` into NUCLEI_CONFIG_DIR on startup. Leaving that
+# behind hands the runtime user a root-owned config file it cannot write, and
+# the uid-10001 check below dies with `permission denied`. That is the second
+# time this exact collision has broken this build by a different route, which
+# is what makes it a class rather than a slip: any root step that can start
+# nuclei has to clean up after itself. `tests/test_workflows.py` enforces it.
+RUN set -eux; \
+    yubel engines --check; \
+    rm -rf /tmp/nuclei-config
 
 # ...and again as the runtime user, because "root can read it" is not the
 # question. This is exactly what the old build got wrong.

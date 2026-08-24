@@ -92,6 +92,25 @@ One cost worth stating: ZAP's `-silent` makes the wrapper skip installing the
 beta passive rules, so an air-gapped ZAP run has fewer rules than an online one
 and can report fewer findings. That is what air-gapped means.
 
+Every run records the version of the tool that produced it, and the reports
+show it. "The same scan yields the same result, every time" is on the front
+page, and for a scanner the tool version *is* the finding set — but `wapiti` and
+`sqlmap` come from apt with no version fixed, so an image built three months
+apart runs a different scan. Pinning those in Debian stable would trade that for
+a build that breaks the day a security update lands. Recording costs nothing and
+answers the question that actually gets asked of an old report: which versions
+produced this? `yubel engines` gained the same column for what is installed
+locally, and the base's probe replaces the two hand-rolled copies dalfox and
+schemathesis already had.
+
+`kube-hunter` is marked unmaintained. Aqua archived the repository; the tool
+still works and is still the only open-source engine that pentests a cluster
+from the inside, so removing it would cost coverage and gain nothing. What was
+wrong was the silence — the engine table listed it exactly like the maintained
+ones. It now carries the label in `docs/engines.md` and in `yubel engines`,
+with the consequence spelled out: its coverage is frozen at its last release, so
+it gains no checks for new CVEs.
+
 ### Fixed
 Skipped engine runs say why, in the reports and not only in `yubel.json`. The
 HTML and Markdown coverage tables showed `skipped` with no reason, which reads

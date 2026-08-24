@@ -156,14 +156,30 @@ def _cmd_engines(check: bool = False) -> int:
     Now the build asks, and fails if the answer is wrong.
     """
     print(BANNER)
-    print(f"{'ENGINE':<16}{'AVAILABLE':<11}{'AUTH':<6}{'TARGETS':<34}CATEGORY")
-    print("-" * 102)
+    print(f"{'ENGINE':<16}{'AVAILABLE':<11}{'VERSION':<12}{'AUTH':<6}"
+          f"{'TARGETS':<34}CATEGORY")
+    print("-" * 114)
     no_auth = []
+    stale = []
     for cls in ALL_ENGINES:
         if cls.name == "demo":
             continue
         eng = cls()
         avail = "yes" if eng.available() else "no"
+        # for a scanner the version *is* the finding set, so "which one do I
+        # have here" is not trivia — it is the difference between two runs
+        # three distinct answers, and collapsing them would be a small lie:
+        # "—" nothing installed to ask, "n/a" installed but has no version
+        # flag (kube-hunter prints usage if you try), "?" asked and the
+        # output carried no version.
+        if not eng.available():
+            version = "—"
+        elif not cls.version_args:
+            version = "n/a"
+        else:
+            version = eng.tool_version() or "?"
+        if cls.unmaintained:
+            stale.append(f"{cls.name} ({cls.unmaintained})")
         # whether credentials actually reach this engine — a scan that runs
         # unauthenticated finds a fraction of what an authenticated one does,
         # and it used to be invisible which engines were in that boat
@@ -172,12 +188,15 @@ def _cmd_engines(check: bool = False) -> int:
             no_auth.append(cls.name)
         tgts = ",".join(t.value for t in cls.supports)
         opt = "  (intrusive/opt-in)" if cls.name in OPT_IN else ""
-        print(f"{cls.name:<16}{avail:<11}{auth:<6}{tgts:<34}{cls.category}{opt}")
+        print(f"{cls.name:<16}{avail:<11}{version:<12}{auth:<6}{tgts:<34}"
+              f"{cls.category}{opt}")
     print("\nMissing engines are simply skipped at runtime — install them "
           "locally or use the Yubel Docker image.")
     if no_auth:
         print(f"AUTH=no means credentials are NOT passed to that engine, so it "
               f"scans anonymously: {', '.join(no_auth)}.")
+    if stale:
+        print(f"Unmaintained upstream, still shipped: {'; '.join(stale)}.")
 
     if check:
         # opt-in engines are excluded on purpose: sqlmap is intrusive and an

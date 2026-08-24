@@ -197,6 +197,59 @@ def test_every_run_body_is_valid_shell():
     assert not failures, "\n".join(failures)
 
 
+def _commands(block):
+    """The individual commands in a RUN, with continuations joined.
+
+    Splitting matters: the Go stage names nuclei twice — once in a module
+    path and once as a loop value — and never runs it. Matching the word
+    anywhere in the block would fail a file that is correct, which is the
+    fastest way to teach someone to delete a test.
+    """
+    body = "\n".join(block).replace("\\\n", " ")
+    body = re.sub(r"^\s*RUN\s+", "", body, count=1)
+    return [c.strip() for c in re.split(r"[;&|]+", body)]
+
+
+def _starts_nuclei(command):
+    """`yubel engines` counts: it asks every tool for its version, so listing
+    the engines starts nuclei as a side effect. That is precisely how this
+    broke the second time."""
+    return command.startswith("nuclei ") or "yubel engines" in command
+
+#: Where the image points NUCLEI_CONFIG_DIR. nuclei writes
+#: `.templates-config.json` there on startup, whoever runs it.
+_NUCLEI_CONFIG = "/tmp/nuclei-config"
+
+
+def test_no_root_step_leaves_a_root_owned_nuclei_config():
+    """A root step that can start nuclei must clean up after itself.
+
+    This build has now broken twice on the same collision by two different
+    routes. First a root step wrote `.templates-config.json` directly; then
+    `yubel engines --check` grew a version probe, which starts nuclei as a
+    side effect of *listing* engines. Either way the runtime user inherits a
+    root-owned config file it cannot write, and the uid-10001 verification
+    dies with `permission denied` — ten minutes into an image build.
+
+    Twice by different routes is a class, not a slip, so the invariant is
+    stated here rather than remembered: if a RUN can start nuclei as root, it
+    removes the config directory in the same instruction.
+    """
+    offenders = []
+    for block in _run_blocks():
+        body = "\n".join(block)
+        if not any(_starts_nuclei(c) for c in _commands(block)):
+            continue
+        if "su yubel" in body:
+            continue                      # runs as the runtime user already
+        if f"rm -rf {_NUCLEI_CONFIG}" in body or f"rm -rf /tmp/tl.txt {_NUCLEI_CONFIG}" in body:
+            continue
+        offenders.append(block[0].strip()[:60])
+    assert not offenders, (
+        f"these root RUN steps can start nuclei and do not remove "
+        f"{_NUCLEI_CONFIG}: " + "; ".join(offenders))
+
+
 # --------------------------------------------------------------------------
 # What went into a digest has to be answerable later
 # --------------------------------------------------------------------------

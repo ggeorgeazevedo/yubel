@@ -139,6 +139,13 @@ graphql-cop reacts to a header it cannot parse by printing one line and \
 carrying on —
 so getting it wrong drops the credentials without failing the run."""
 
+UNMAINTAINED_NOTE = """\
+*(unmaintained)* means upstream has stopped work on the tool. It still runs — \
+an
+unmaintained scanner is not a broken one — but it stops gaining checks for new \
+CVEs, so
+treat its coverage as frozen at its last release:"""
+
 OFFLINE_INTRO = """\
 Generated from each adapter's own declaration, so it cannot drift from the \
 code. An
@@ -269,8 +276,15 @@ def render() -> str:
         auth = "yes" if engine.supports_auth() else "**no**"
         targets = ", ".join(t.value for t in cls.supports)
         opt = " *(opt-in)*" if cls.name in OPT_IN else ""
-        lines.append(f"| `{cls.name}`{opt} | `{cls.binary}` | {auth} | "
+        stale = " *(unmaintained)*" if cls.unmaintained else ""
+        lines.append(f"| `{cls.name}`{opt}{stale} | `{cls.binary}` | {auth} | "
                      f"{cls.default_timeout}s | {targets} | {cls.category} |")
+
+    unmaintained = [cls for cls in ALL_ENGINES if cls.unmaintained]
+    if unmaintained:
+        lines += ["", *UNMAINTAINED_NOTE.splitlines()]
+        for cls in unmaintained:
+            lines.append(f"- `{cls.name}` — {cls.unmaintained}")
 
     lines += [
         "",

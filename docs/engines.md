@@ -20,7 +20,12 @@ or if an engine reads an option that has no description here.
 | `schemathesis` | `schemathesis` | yes | 1200s | api, graphql | API property-based fuzzing |
 | `graphw00f` | `graphw00f` | **no** | 180s | graphql | GraphQL fingerprint |
 | `graphql-cop` | `graphql-cop` | yes | 300s | graphql | GraphQL security audit |
-| `kube-hunter` | `kube-hunter` | **no** | 900s | kubernetes | kubernetes cluster pentest |
+| `kube-hunter` *(unmaintained)* | `kube-hunter` | **no** | 900s | kubernetes | kubernetes cluster pentest |
+
+*(unmaintained)* means upstream has stopped work on the tool. It still runs — an
+unmaintained scanner is not a broken one — but it stops gaining checks for new CVEs, so
+treat its coverage as frozen at its last release:
+- `kube-hunter` — archived upstream by Aqua Security; no new checks or CVEs
 
 **Auth = no** means credentials are not passed to that engine: it scans anonymously,
 finds a fraction of what an authenticated run would, and reports that as a normal result.

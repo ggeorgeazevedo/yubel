@@ -35,6 +35,15 @@ class KubeHunterEngine(Engine):
     #: results. Our image builds from the open-source Dockerfile.
     offline_note = ("dispatches to stdout; the uploading plugin exists only "
                     "in the vendor's :aqua image")
+    #: Aqua Security archived the repository. The tool still works and is
+    #: still the only open-source engine that dynamically pentests a cluster
+    #: from inside, so removing it would cost coverage and gain nothing. What
+    #: was wrong was the silence: the engine table listed it exactly like the
+    #: maintained ones. Saying so is the fix; replacing it is a decision with
+    #: no candidate behind it yet.
+    unmaintained = "archived upstream by Aqua Security; no new checks or CVEs"
+    #: kube-hunter has no --version flag; asking would print usage.
+    version_args = ()
 
     def available(self) -> bool:
         return shutil.which("kube-hunter") is not None
