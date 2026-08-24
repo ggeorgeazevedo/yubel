@@ -125,11 +125,12 @@ def write_markdown(result: ScanResult, path: str) -> None:
     # binary is missing, or because `--offline` could not be honoured. The
     # message was already on the record and only `yubel.json` showed it.
     lines.append("## Engine coverage\n")
-    lines.append("| Engine | Target | Status | Findings | Time | Why |")
-    lines.append("|---|---|---|---|---|---|")
+    lines.append("| Engine | Version | Target | Status | Findings | Time | Why |")
+    lines.append("|---|---|---|---|---|---|---|")
     for r in sorted(result.runs, key=lambda x: (x.target, x.engine)):
-        lines.append(f"| `{r.engine}` | {r.target} | {r.status} | "
-                     f"{r.findings} | {r.duration}s | {r.message or '—'} |")
+        lines.append(f"| `{r.engine}` | {r.tool_version or '—'} | {r.target} | "
+                     f"{r.status} | {r.findings} | {r.duration}s | "
+                     f"{r.message or '—'} |")
     lines.append("")
 
     with open(path, "w", encoding="utf-8") as fh:

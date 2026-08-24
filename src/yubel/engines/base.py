@@ -14,6 +14,7 @@ import base64
 import json
 import os
 import shutil
+import re
 import subprocess
 import tempfile
 import time
@@ -21,6 +22,9 @@ from typing import List, Optional, Tuple
 
 from ..models import EngineRun, Finding, Target, TargetType
 from ..redact import redact_argv, secrets_of
+
+#: engine name -> detected version, for the life of the process
+_VERSIONS: dict = {}
 
 
 class Engine:
@@ -36,6 +40,52 @@ class Engine:
     default_timeout: int = 900
     #: url the engine came from (for the manifest / credits)
     homepage: str = ""
+
+    # ---- provenance -----------------------------------------------------
+    # "The same scan yields the same result, every time" is on the front page,
+    # and for a scanner the tool version *is* the finding set: wapiti and
+    # sqlmap come from apt with no version fixed, so an image built three
+    # months apart runs a different scan. Pinning apt versions in Debian
+    # stable trades that for a build that breaks the day a security update
+    # lands. Recording costs nothing and answers the question that actually
+    # gets asked of an old report — which versions produced this?
+    #
+    #: How to ask this binary for its version. Two adapters already shelled
+    #: out for exactly this with the same six lines each.
+    version_args: Tuple[str, ...] = ("--version",)
+    #: Tools whose version this adapter cannot ask for set this to (); the
+    #: report then says nothing rather than guessing.
+    #:
+    #: Marked when upstream no longer maintains the tool. It still runs — an
+    #: unmaintained scanner is not a broken one — but the operator should see
+    #: it in `yubel engines` and in the docs rather than find out later.
+    unmaintained: str = ""
+
+    def tool_version(self) -> str:
+        """The installed version of the underlying tool, or "" if unknown.
+
+        Cached per engine name for the process: a scan runs each engine once
+        per target, and asking N times is N subprocesses for one answer.
+        Never raises — an unknown version is a blank column, not a failed
+        scan.
+        """
+        if not self.binary or not self.version_args:
+            return ""
+        if self.name not in _VERSIONS:
+            _VERSIONS[self.name] = self._detect_version()
+        return _VERSIONS[self.name]
+
+    def _detect_version(self) -> str:
+        try:
+            done = subprocess.run(
+                [self.binary, *self.version_args],
+                capture_output=True, text=True, timeout=15,
+                env={**os.environ, "NO_COLOR": "1"})
+        except Exception:
+            return ""
+        found = re.search(r"\d+\.\d+(?:\.\d+)?",
+                          f"{done.stdout}\n{done.stderr}")
+        return found.group(0) if found else ""
 
     # ---- `--offline` ----------------------------------------------------
     # The flag used to be set on ten engines and read by one. The other nine
@@ -208,6 +258,7 @@ class Engine:
             rec.finished_at = time.time()
             return [], rec
 
+        rec.tool_version = self.tool_version()
         workdir = tempfile.mkdtemp(prefix=f"yubel-{self.name}-")
         try:
             cmd = self.build_command(target, workdir)

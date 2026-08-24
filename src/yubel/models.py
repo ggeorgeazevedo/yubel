@@ -220,6 +220,10 @@ class EngineRun:
     findings: int = 0
     message: str = ""
     command: str = ""
+    #: version of the underlying tool, "" when it could not be determined.
+    #: For a scanner the version *is* the finding set, so a report that does
+    #: not name it cannot be checked against a later one.
+    tool_version: str = ""
 
     @property
     def duration(self) -> float:

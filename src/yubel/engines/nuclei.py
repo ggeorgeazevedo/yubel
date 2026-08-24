@@ -53,6 +53,7 @@ class NucleiEngine(Engine):
             rec.message = reason
             rec.finished_at = time.time()
             return [], rec
+        rec.tool_version = self.tool_version()
 
         passes = self.passes()
 

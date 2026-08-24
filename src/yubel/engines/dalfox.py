@@ -69,6 +69,7 @@ class DalfoxEngine(Engine):
             rec.message = reason
             rec.finished_at = time.time()
             return [], rec
+        rec.tool_version = self.tool_version()
 
         urls = target.param_urls(int(self.options.get("max_urls", 25))) \
             or [target.endpoint()]
