@@ -4,7 +4,7 @@ description: Cloud-native, multi-target DAST orchestrator (Job/CronJob)
 type: application
 version: 0.2.0
 # Tracks the Yubel release this chart is written against.
-appVersion: "0.7.2"
+appVersion: "0.8.0"
 home: https://github.com/ggeorgeazevedo/yubel
 sources:
   - https://github.com/ggeorgeazevedo/yubel
