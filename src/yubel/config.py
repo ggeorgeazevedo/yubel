@@ -10,7 +10,8 @@ import os
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from .models import Auth, Target, TargetType
+from .models import K8S_MODES, Auth, Target, TargetType
+from .netguard import internal_reason
 from .severity import Severity
 
 try:
@@ -37,6 +38,7 @@ class Config:
     fail_on_new: bool = False                                 # gate only on new
     include_opt_in: bool = False
     offline: bool = False                                     # air-gapped hardening
+    allow_internal: bool = False                              # scan RFC1918/loopback/IMDS
     baseline: Optional[str] = None                            # prior yubel.json
     chains: bool = True                                       # attack-chain synth
     cluster_threshold: int = 8                                # noise clustering
@@ -68,6 +70,7 @@ class Config:
             fail_on_new=bool(data.get("fail_on_new", False)),
             include_opt_in=bool(data.get("include_opt_in", False)),
             offline=bool(data.get("offline", False)),
+            allow_internal=bool(data.get("allow_internal", False)),
             baseline=_expand(data.get("baseline")),
             chains=bool(data.get("chains", True)),
             cluster_threshold=int(data.get("cluster_threshold", 8)),
@@ -92,6 +95,60 @@ class Config:
         errors += self._unknown_engine_errors()
         errors += self._uncovered_target_errors()
         errors += self._bad_option_value_errors()
+        errors += self._internal_target_errors()
+        errors += self._k8s_mode_errors()
+        return errors
+
+    def _internal_target_errors(self) -> List[str]:
+        """Refuse to aim the scanners at the infrastructure running them.
+
+        See `netguard.py` for what is refused and why a name is never
+        resolved. Every URL a target can carry is checked, not just the
+        endpoint: `openapi` and `options.schemathesis.base_url` are fetched
+        too, and either can name an address the endpoint does not.
+
+        One route stays open by construction: `options.nuclei.extra_args` is
+        concatenated into the argv, so `-u <anything>` there is not reachable
+        from here. That is what an escape hatch is; it is documented as one.
+        """
+        if self.allow_internal:
+            return []
+        suffix = ("; pass --allow-internal (or allow_internal: true) if this "
+                  "is an authorized internal assessment")
+        errors = []
+        for t in self.targets:
+            places = [("target", t.endpoint()), ("openapi spec", t.openapi)]
+            for what, value in places:
+                reason = internal_reason(value or "")
+                if reason:
+                    errors.append(f"{what} of {t.label} refused: {reason}{suffix}")
+        base_url = (self.options.get("schemathesis") or {}).get("base_url")
+        reason = internal_reason(base_url or "") if isinstance(base_url, str) else None
+        if reason:
+            errors.append(f"options.schemathesis.base_url refused: {reason}{suffix}")
+        return errors
+
+    def _k8s_mode_errors(self) -> List[str]:
+        """`--k8s-mode` has `choices`; the YAML path had nothing.
+
+        An unknown mode is not a typo that fails loudly — it falls past every
+        branch in `KubeHunterEngine.build_command`, and the engine runs with
+        no vantage flag, exits 0 and reports nothing. A green scan that never
+        scanned is the worst output this tool can produce.
+        """
+        errors = []
+        for t in self.targets:
+            if t.type != TargetType.KUBERNETES:
+                continue
+            if t.k8s_mode not in K8S_MODES:
+                errors.append(
+                    f"target {t.label}: unknown k8s_mode {t.k8s_mode!r} "
+                    f"(expected one of {', '.join(K8S_MODES)})")
+            elif t.k8s_mode == "remote" and not (t.host or t.url):
+                errors.append(
+                    f"target {t.label}: k8s_mode 'remote' needs a host or url "
+                    f"to point kube-hunter at (use 'internal' or 'pod' to scan "
+                    f"from inside the cluster)")
         return errors
 
     def _bad_option_value_errors(self) -> List[str]:

@@ -16,7 +16,7 @@ import os
 import shutil
 from typing import List
 
-from ..models import Finding, Target, TargetType
+from ..models import K8S_MODES, Finding, Target, TargetType
 from .base import Engine
 
 
@@ -35,13 +35,26 @@ class KubeHunterEngine(Engine):
         out = os.path.join(workdir, "kh.json")
         cmd = [self.binary, "--report", "json", "--log", "none"]
         mode = target.k8s_mode or "remote"
+        # No `else: pass`. An unrecognised mode used to fall past all three
+        # branches and leave kube-hunter with no vantage flag: it exits 0,
+        # finds nothing, and the run is recorded as ok — a clean bill of
+        # health for a scan that never happened. `Config.validate()` catches
+        # this before anything runs; this catches a Config built in code.
         if mode == "remote":
             host = target.host or target.url or ""
+            if not host:
+                raise ValueError(
+                    "k8s_mode 'remote' needs a host or url; --remote '' scans "
+                    "nothing and would still exit 0")
             cmd += ["--remote", host]
         elif mode == "internal":
             cmd += ["--interface"]
         elif mode == "pod":
             cmd += ["--pod"]
+        else:
+            raise ValueError(
+                f"unknown k8s_mode {mode!r} (expected one of "
+                f"{', '.join(K8S_MODES)})")
         if self.options.get("active"):
             cmd += ["--active"]  # opt-in: performs exploitation attempts
         # kube-hunter prints JSON to stdout; we also redirect for safety

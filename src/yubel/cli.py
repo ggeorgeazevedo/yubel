@@ -16,7 +16,7 @@ from typing import List, Optional
 from . import __version__
 from .config import Config, OutputConfig
 from .engines import ALL_ENGINES, OPT_IN
-from .models import Auth, Target, TargetType
+from .models import K8S_MODES, Auth, Target, TargetType
 from .orchestrator import Orchestrator, gate
 from .reporters import write_reports
 from .severity import Severity
@@ -51,8 +51,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                     help="target type for --target (default: web)")
     ps.add_argument("--openapi", help="OpenAPI/Swagger spec path or URL (api targets)")
     ps.add_argument("--kube", help="Kubernetes remote host/IP (kubernetes target)")
-    ps.add_argument("--k8s-mode", default="remote",
-                    choices=["remote", "internal", "pod"])
+    ps.add_argument("--k8s-mode", default="remote", choices=list(K8S_MODES))
     ps.add_argument("-e", "--engine", action="append", default=[],
                     help="allow-list an engine (repeatable)")
     ps.add_argument("-x", "--disable", action="append", default=[],
@@ -86,6 +85,12 @@ def main(argv: Optional[List[str]] = None) -> int:
                     help="air-gapped hardening: engines make no external calls "
                          "(no OAST/interactsh, no update checks). Yubel's core "
                          "never phones home regardless.")
+    ps.add_argument("--allow-internal", action="store_true",
+                    help="permit link-local (169.254/16, the cloud metadata "
+                         "service), loopback and RFC1918 targets. Refused by "
+                         "default: the metadata endpoint answers with the "
+                         "credentials of whatever is running the scan, and "
+                         "those would land whole in the report.")
     ps.add_argument("--no-crawl", action="store_true",
                     help="do not feed crawler-discovered URLs to the parameter "
                          "scanners (scan only the seed URL of each target)")
@@ -336,6 +341,8 @@ def _cmd_scan(args) -> int:
         cfg.offline = True
     if cfg.offline:
         _apply_offline(cfg)
+    if args.allow_internal:
+        cfg.allow_internal = True
     if args.no_crawl:
         cfg.crawl = False
     if args.crawl_headless:

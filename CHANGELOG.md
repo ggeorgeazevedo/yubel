@@ -6,6 +6,52 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow
 
 ## [Unreleased]
 
+### Security
+Yubel refuses to be aimed at the infrastructure running it. Nothing stopped
+`yubel scan -t http://169.254.169.254/latest/meta-data/iam/security-credentials/`
+before this. That address is the cloud instance metadata service: it answers to
+whatever is running the scan, and it answers with credentials. Two decisions
+elsewhere are individually correct and combined badly with it — nuclei runs with
+`-irr`, so request and response are attached to every finding, and `redact.py`
+deliberately does not mask a secret found *on the target*, because masking it
+would destroy the finding. The role credential went whole into `yubel.json` and
+into the HTML.
+
+Link-local (169.254.0.0/16, plus the IPv6 and CGNAT metadata addresses),
+loopback and RFC1918 are now refused by `validate()` — for the target endpoint,
+for `openapi`, and for `options.schemathesis.base_url`, since all three are
+fetched. `--allow-internal` / `allow_internal: true` is the way through for an
+authorized internal assessment, and the error message says so rather than
+leaving the operator to find it in the source.
+
+The crawler is filtered by the same rule, at the seam where its URLs become
+scanner targets. `validate()` runs once, before anything executes, and sees
+only what the operator wrote; katana follows links and pulls routes out of JS
+bundles, so a link to the metadata service on the target's own pages arrived
+after the check. Refusals are recorded on the crawler's run message rather than
+silently dropped — "the scan ignored something" must never be deducible only
+from a smaller number.
+
+Two limits, both deliberate and both documented: a **hostname is never
+resolved** (resolving would make `validate()` do network I/O in a tool whose
+core never phones home, would leak the target list to a resolver, and would not
+hold anyway — DNS answers change between check and request), and
+`options.nuclei.extra_args` still concatenates into the argv, which is what an
+escape hatch is.
+
+### Fixed
+An unknown `k8s_mode` from YAML no longer produces a green scan that never
+scanned. `--k8s-mode` had argparse `choices`; the YAML path had nothing, so
+`k8s_mode: pods` fell past all three branches in `KubeHunterEngine`, which then
+ran with no vantage flag, exited 0 and recorded an `ok` run with zero findings.
+A clean bill of health for a scan that never happened is worse than a crash,
+because a crash gets investigated. `validate()` now rejects the value, the
+engine raises rather than building a vantage-less command, and `remote` without
+a host — `--remote ''`, also exit 0, also nothing — is refused at both layers.
+The three modes now live in one tuple, `models.K8S_MODES`, read by argparse, by
+the validator and by the engine; they were three independent literals and two
+comments, which is how they drifted apart.
+
 ### Changed
 Nothing shipped defaults to a floating image tag any more. `action.yml`, the
 Kubernetes Job manifest and the Helm chart all resolved to

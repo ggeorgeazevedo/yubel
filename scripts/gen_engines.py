@@ -167,6 +167,11 @@ on new/regressed. |
 | `offline` | {str(_D.offline).lower()} | Air-gapped hardening. Today this \
 reaches **nuclei only** (no OAST/interactsh, no template update check); the \
 other engines ignore it. |
+| `allow_internal` | {str(_D.allow_internal).lower()} | Permit link-local \
+(169.254/16 — the cloud metadata service), loopback and RFC1918 targets. \
+Refused by default, including URLs the crawler discovers at runtime. A \
+hostname is never resolved, so a name pointing at an internal address still \
+passes. |
 | `output.dir` | {_D.output.dir} | Where reports are written. |
 | `output.formats` | {", ".join(_D.output.formats)} | Reporters to run (`md` \
 is an alias for `markdown`). |
