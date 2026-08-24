@@ -7,12 +7,21 @@ one-off scans; the CLI simply builds an equivalent Config.
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from .models import K8S_MODES, Auth, Target, TargetType
-from .netguard import internal_reason
+from .netguard import host_of, internal_reason
 from .severity import Severity
+
+
+def _compiles(pattern: str) -> bool:
+    try:
+        re.compile(pattern)
+    except re.error:
+        return False
+    return True
 
 try:
     import yaml  # PyYAML
@@ -97,6 +106,41 @@ class Config:
         errors += self._bad_option_value_errors()
         errors += self._internal_target_errors()
         errors += self._k8s_mode_errors()
+        errors += self._scope_errors()
+        return errors
+
+    def _scope_errors(self) -> List[str]:
+        """`scope` and `exclude` are regexes, and a regex can be wrong.
+
+        These two were read from the YAML and consulted by nothing for the
+        whole life of the project, so nothing ever checked them either. Now
+        that they bound a scan, a broken one has to fail here rather than
+        raise `re.error` from a worker thread halfway through a run — and a
+        scope that excludes the operator's own target is a mistake worth
+        naming, since it silently means "discover nothing".
+        """
+        errors = []
+        for t in self.targets:
+            for field_name in ("scope", "exclude"):
+                for pattern in getattr(t, field_name) or []:
+                    try:
+                        re.compile(pattern)
+                    except re.error as exc:
+                        errors.append(f"target {t.label}: {field_name} pattern "
+                                      f"{pattern!r} is not a valid regex ({exc})")
+            host = host_of(t.endpoint())
+            if not host:
+                continue
+            good = [p for p in (t.scope or []) if _compiles(p)]
+            if good and not any(re.search(p, host) for p in good):
+                errors.append(
+                    f"target {t.label}: no scope pattern matches its own host "
+                    f"{host}, so the crawler would discard everything it finds")
+            for pattern in (t.exclude or []):
+                if _compiles(pattern) and re.search(pattern, t.endpoint()):
+                    errors.append(
+                        f"target {t.label}: exclude pattern {pattern!r} matches "
+                        f"the target's own endpoint")
         return errors
 
     def _internal_target_errors(self) -> List[str]:

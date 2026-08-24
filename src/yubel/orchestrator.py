@@ -9,6 +9,7 @@ Design goals:
 from __future__ import annotations
 
 import concurrent.futures as futures
+import re
 from typing import Callable, Optional
 
 from . import __version__
@@ -16,7 +17,7 @@ from .config import Config
 from .engines import select_for
 from .engines.demo import DemoEngine
 from .models import ScanResult, Target
-from .netguard import internal_reason
+from .netguard import host_of, internal_reason
 
 ProgressCb = Optional[Callable[[str], None]]
 
@@ -134,37 +135,69 @@ class Orchestrator:
                           f"{tgt.label}; feeding the parameter scanners{note}")
 
     def _contain(self, urls, target: Target, result: ScanResult):
-        """Drop discovered URLs that `Config.validate()` would have refused.
+        """Decide which crawler-discovered URLs are actually in bounds.
 
         `validate()` runs once, before anything executes, and sees only the
         targets the operator wrote. These URLs come from the crawler at
         runtime — katana follows links, and with `-jc` it extracts routes out
-        of JS bundles — so a link to `169.254.169.254` on the target's own
-        pages walks straight past the check and into nuclei and dalfox.
-        Refusing at the seam is the only place that covers it.
+        of JS bundles — so a link to `169.254.169.254`, or to a host that is
+        not the target at all, walks straight past the check and into nuclei
+        and dalfox. This seam is the only place that covers it.
 
         Refusals are recorded, not just dropped: the count and the first
         reason go onto the crawler's `EngineRun.message`, so `yubel.json`
         carries the fact. "The scan ignored something" must never be
         deducible only from a smaller number.
         """
-        if self.config.allow_internal:
-            return urls
         kept, refused = [], []
         for url in urls:
-            reason = internal_reason(url)
+            reason = self._refusal(url, target)
             if reason:
                 refused.append(f"{url} ({reason})")
             else:
                 kept.append(url)
         if refused:
-            note = (f"{len(refused)} discovered URL(s) refused as internal; "
+            note = (f"{len(refused)} discovered URL(s) not scanned; "
                     f"first: {refused[0]}")
             self.progress(f"  ! {note}")
             for rec in result.runs:
                 if rec.engine == "katana" and rec.target == target.label:
                     rec.message = f"{rec.message} — {note}" if rec.message else note
         return kept
+
+    def _refusal(self, url: str, target: Target):
+        """Why this discovered URL is not scanned, or None to scan it.
+
+        Order matters. Internal addresses are refused first because that is a
+        safety rule, not a scoping preference — `scope` must not be able to
+        opt a scan back into the metadata service. Then `exclude`, because an
+        explicit denial outranks an inclusion. Then `scope`. Then, when the
+        target declares neither, the default.
+
+        That default is containment: a URL on a host other than the target's
+        own is not scanned. The crawler follows links off-site and pulls
+        routes out of JS bundles, so without this a link to a partner's
+        domain, a CDN, or an analytics host puts real attack traffic on
+        infrastructure nobody authorised. `scope` is how you say the other
+        host is yours.
+        """
+        if not self.config.allow_internal:
+            reason = internal_reason(url)
+            if reason:
+                return reason
+        for pattern in target.exclude:
+            if re.search(pattern, url):
+                return f"matches exclude /{pattern}/"
+        host = host_of(url)
+        if target.scope:
+            if not any(re.search(pattern, host) for pattern in target.scope):
+                return f"host {host or '?'} is outside the target's scope"
+            return None
+        seed = host_of(target.endpoint())
+        if seed and host and host != seed:
+            return (f"host {host} is not {seed}; list it in the target's "
+                    f"`scope` to scan it")
+        return None
 
     def _run_one(self, engine, target: Target):
         try:
