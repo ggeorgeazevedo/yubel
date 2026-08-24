@@ -80,6 +80,46 @@ def test_the_release_build_job_cannot_reach_the_publishing_credentials():
     assert "id-token" not in job["permissions"]
 
 
+def test_every_release_job_waits_on_the_on_main_guard():
+    """A release tag that is not on `main` publishes unreviewed code.
+
+    It happened: `v0.8.0` was tagged on a feature-branch commit that the
+    squash-merge discarded, so the tag names a commit reachable from no
+    branch. PyPI refuses to republish a version, so that tag could not be
+    corrected — only superseded. A guard job is only a guard if nothing can
+    reach PyPI around it, so this asserts the *whole* job graph hangs off it,
+    transitively: adding a job with no `needs:` is the way this comes back.
+    """
+    data = yaml.safe_load((ROOT / ".github" / "workflows" / "release.yml")
+                          .read_text(encoding="utf-8"))
+    jobs = data["jobs"]
+    assert "guard" in jobs, "release.yml lost the on-main guard job"
+
+    def waits_on_guard(name, seen=frozenset()):
+        if name in seen:                       # a cycle would hang, not pass
+            return False
+        needs = jobs[name].get("needs") or []
+        needs = [needs] if isinstance(needs, str) else needs
+        return "guard" in needs or any(
+            waits_on_guard(n, seen | {name}) for n in needs)
+
+    unguarded = [name for name in jobs
+                 if name != "guard" and not waits_on_guard(name)]
+    assert not unguarded, (
+        "these release jobs run without the tag being on main: "
+        + ", ".join(sorted(unguarded)))
+
+
+def test_the_guard_actually_tests_ancestry():
+    """`git merge-base --is-ancestor` is the check; a rewrite that drops it
+    (say, to a `git branch --contains` grep) is what this notices."""
+    text = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+    guard = text.split("guard:", 1)[1].split("\n  build:", 1)[0]
+    assert "merge-base --is-ancestor" in guard
+    assert "fetch-depth: 0" in guard, (
+        "a shallow checkout has no history to compute ancestry against")
+
+
 def test_release_build_tools_are_version_pinned():
     text = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
     for tool in ("build", "twine"):
