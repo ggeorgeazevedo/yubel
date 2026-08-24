@@ -58,7 +58,7 @@ inputs:
     required: false
     default: "false"
   offline:
-    description: "Air-gapped hardening: passes --offline, which today disables nuclei OAST/interactsh and template update checks; other engines are not yet covered"
+    description: "Air-gapped hardening: passes --offline. Every engine either honours it with a verified switch or is skipped, with the reason in the report"
     required: false
     default: "false"
   out:

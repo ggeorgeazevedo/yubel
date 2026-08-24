@@ -23,6 +23,20 @@ class ZapEngine(Engine):
     binary = ""  # resolved dynamically (script name varies)
     default_timeout = 1800
     homepage = "https://www.zaproxy.org/"
+    offline_ok = True
+    #: ZAP's own help: "-silent  Ensures ZAP does not make any unsolicited
+    #: requests, including 'check for updates'". It reaches the daemon
+    #: through the wrapper's -z passthrough.
+    #:
+    #: It is not free. The wrappers read their own arguments and skip
+    #: `-addonupdate -addoninstall pscanrulesBeta` when -silent is present,
+    #: so an offline ZAP run has fewer passive rules than an online one and
+    #: can therefore report fewer findings. That is the honest trade and it
+    #: is written in the docs: air-gapped means air-gapped, including the
+    #: part where you do not download rules mid-scan.
+    offline_args = ("-z", "-silent")
+    offline_note = ("-z -silent stops all unsolicited requests; note it also "
+                    "skips the beta passive rules the wrapper would install")
 
     #: Every web entrypoint, for the availability probe. Which one actually
     #: runs is decided by `mode`, not by this order.
@@ -102,7 +116,7 @@ class ZapEngine(Engine):
                 cmd[cmd.index(target.endpoint())] = target.openapi
         if self.options.get("ajax"):
             cmd += ["-j"]
-        return cmd
+        return cmd + self.offline_flags()
 
     def parse(self, target: Target, workdir: str, stdout: str) -> List[Finding]:
         report = os.path.join(workdir, "zap.json")

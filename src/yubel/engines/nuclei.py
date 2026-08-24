@@ -37,18 +37,20 @@ class NucleiEngine(Engine):
     header_flag = "-H"
     default_timeout = 900
     homepage = "https://github.com/projectdiscovery/nuclei"
+    offline_ok = True
+    #: placed by build_command_for, which also decides between -duc alone and
+    #: -ni -duc depending on where the templates come from.
+    offline_args = ("-ni", "-duc")
+    offline_note = ("-ni disables OAST/interactsh callbacks, -duc the "
+                    "template update check")
 
     def run(self, target: Target) -> Tuple[List[Finding], EngineRun]:
         rec = EngineRun(engine=self.name, target=target.label)
         rec.started_at = time.time()
-        if not self.handles(target):
+        reason = self.skip_reason(target)
+        if reason:
             rec.status = "skipped"
-            rec.message = f"does not handle target type {target.type}"
-            rec.finished_at = time.time()
-            return [], rec
-        if not self.available():
-            rec.status = "skipped"
-            rec.message = self.unavailable_reason()
+            rec.message = reason
             rec.finished_at = time.time()
             return [], rec
 

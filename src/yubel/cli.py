@@ -383,9 +383,20 @@ def _apply_offline(cfg) -> None:
     targets you point it at. This flag additionally stops the *engines* from
     reaching out (e.g. Nuclei's OAST/interactsh server or template update
     checks), so the whole run stays inside your perimeter.
+
+    Every registered engine, not a list written here. The list used to name
+    ten, which meant sqlmap, graphw00f and graphql-cop never even received
+    the option: they ran under `--offline` with nothing having considered
+    whether they should. A hand-maintained list of engines, next to a
+    registry of engines, is a list that will be wrong.
+
+    What each engine does with the option is its own declaration —
+    `offline_ok` / `offline_args` / `offline_note` on the adapter — and an
+    engine that cannot honour it is skipped with that note as the reason.
     """
-    for name in ("nuclei", "katana", "httpx", "nikto", "wapiti", "testssl",
-                 "dalfox", "schemathesis", "zap", "kube-hunter"):
+    from .engines import registry
+
+    for name in registry():
         cfg.options.setdefault(name, {})["offline"] = True
 
 

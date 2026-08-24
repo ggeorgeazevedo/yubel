@@ -21,6 +21,12 @@ class TestSSLEngine(Engine):
     binary = "testssl.sh"
     default_timeout = 600
     homepage = "https://testssl.sh/"
+    offline_ok = True
+    #: `none` performs no DNS lookups at all. Revocation checking (CRL/OCSP),
+    #: the other external call, is opt-in behind --phone-out and this adapter
+    #: never passes it; the trust stores ship inside the tool.
+    offline_args = ("--nodns", "none")
+    offline_note = "--nodns none; CRL/OCSP is opt-in and never requested"
 
     def available(self) -> bool:
         import shutil
@@ -40,8 +46,10 @@ class TestSSLEngine(Engine):
 
     def build_command(self, target: Target, workdir: str) -> List[str]:
         out = os.path.join(workdir, "testssl.json")
+        # the host is a trailing positional, so the offline flags go before it
         return [self._bin(), "--jsonfile", out, "--quiet", "--warnings", "off",
                 "--severity", self.options.get("severity", "LOW"),
+                *self.offline_flags(),
                 self._hostport(target)]
 
     def parse(self, target: Target, workdir: str, stdout: str) -> List[Finding]:

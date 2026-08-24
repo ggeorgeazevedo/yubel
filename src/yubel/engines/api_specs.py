@@ -17,6 +17,17 @@ class SchemathesisEngine(Engine):
     header_flag = "-H"
     default_timeout = 1200
     homepage = "https://github.com/schemathesis/schemathesis"
+    offline_ok = True
+    #: Telemetry rides with `--report`, which uploads to schemathesis.io.
+    #: This adapter never passes `--report`, so there is nothing to send and
+    #: no flag to pass. Deliberately not passing
+    #: `--schemathesis-io-telemetry=false`: it only exists from 3.16.1, and
+    #: passing an unknown flag to an older 3.x would turn `--offline` into a
+    #: broken run — a cure worse than the disease.
+    #:
+    #: The remaining egress is the operator's own: a spec given as a remote
+    #: URL is fetched. That is the target, not a side channel.
+    offline_note = "telemetry rides with --report, which is never passed"
 
     #: cached detected major version of the installed schemathesis
     _major = None

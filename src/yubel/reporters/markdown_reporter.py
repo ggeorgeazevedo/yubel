@@ -119,12 +119,17 @@ def write_markdown(result: ScanResult, path: str) -> None:
             lines.append(f"- {f.severity.label}: {f.title} `{f.location or f.target}`")
         lines.append("")
 
+    # The `Why` column is the point of this table. A run recorded "skipped"
+    # with no reason reads as housekeeping; the reason is what tells the
+    # operator that an engine was left out of *this* scan — because the
+    # binary is missing, or because `--offline` could not be honoured. The
+    # message was already on the record and only `yubel.json` showed it.
     lines.append("## Engine coverage\n")
-    lines.append("| Engine | Target | Status | Findings | Time |")
-    lines.append("|---|---|---|---|---|")
+    lines.append("| Engine | Target | Status | Findings | Time | Why |")
+    lines.append("|---|---|---|---|---|---|")
     for r in sorted(result.runs, key=lambda x: (x.target, x.engine)):
         lines.append(f"| `{r.engine}` | {r.target} | {r.status} | "
-                     f"{r.findings} | {r.duration}s |")
+                     f"{r.findings} | {r.duration}s | {r.message or '—'} |")
     lines.append("")
 
     with open(path, "w", encoding="utf-8") as fh:

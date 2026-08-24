@@ -170,14 +170,27 @@ def _coverage_section(coverage) -> str:
 
 
 def _runs_section(result) -> str:
+    """The `Why` column is the point of this table.
+
+    A row reading "skipped" and nothing else looks like housekeeping. The
+    reason is what tells a reader that an engine was left out of *this* scan:
+    the binary was missing, or `--offline` could not be honoured and the
+    engine was dropped rather than run under a promise nobody checked. The
+    text was already on the run record and only `yubel.json` ever showed it.
+    """
     rows = "".join(
         f"<tr><td><code>{_e(r.engine)}</code></td><td>{_e(r.target)}</td>"
         f'<td><span class="st st-{r.status}">{_e(r.status)}</span></td>'
-        f'<td class="num">{r.findings}</td><td class="num">{r.duration}s</td></tr>'
+        f'<td class="num">{r.findings}</td><td class="num">{r.duration}s</td>'
+        f'<td class="why">{_e(r.message) if r.message else "&mdash;"}</td></tr>'
         for r in sorted(result.runs, key=lambda x: (x.target, x.engine)))
-    return (f'<section><h2>Engine coverage</h2><table class="runs">'
+    skipped = sum(1 for r in result.runs if r.status == "skipped")
+    note = (f'<p class="muted">{skipped} engine run(s) did not execute; the '
+            f'reason for each is in the last column.</p>' if skipped else "")
+    return (f'<section><h2>Engine coverage</h2>{note}<table class="runs">'
             f'<thead><tr><th>Engine</th><th>Target</th><th>Status</th>'
-            f'<th class="num">Findings</th><th class="num">Time</th></tr></thead>'
+            f'<th class="num">Findings</th><th class="num">Time</th>'
+            f'<th>Why</th></tr></thead>'
             f'<tbody>{rows}</tbody></table></section>')
 
 
@@ -393,6 +406,7 @@ code{{font-family:var(--mono);font-size:12.5px}}
 .st{{font-size:11px;font-weight:600}}
 .st-ok{{color:#1f7a4d}} .st-skipped{{color:var(--muted)}}
 .st-error,.st-timeout{{color:#9d2235}}
+td.why{{color:var(--muted);font-size:12.5px;max-width:38ch}}
 
 /* filters */
 .filters{{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}}

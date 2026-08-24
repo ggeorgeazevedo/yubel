@@ -54,7 +54,7 @@ The whole industry is running in the same direction: **bolt an LLM on to "valida
 Yubel goes **the opposite way.** And it's a choice, not a limitation.
 
 - **No LLM, no cloud.** The core makes **zero outbound calls** — it only ever talks to the targets you point it at. Your results never leave your perimeter.
-- **An `--offline` switch on top of that.** It disables nuclei's OAST/interactsh callbacks and its template update check. The other engines are not covered yet, so `--offline` is defence in depth around an already-zero-egress core, not a guarantee about every subprocess. The core itself runs entirely inside isolated, air-gapped, on-prem networks — where AI-driven tools simply can't go.
+- **An `--offline` switch on top of that.** Every engine either honours it with a switch verified against that tool's own documentation — nuclei's `-ni -duc`, ZAP's `-silent`, nikto's `-nolookup`, testssl's `--nodns none`, wapiti's `--no-bugreport` — or is skipped, with the reason written into the report. Two are skipped today, and the report says which and why. The alternative was to run them and call the scan offline anyway, which is how the word stops meaning anything. The core itself runs entirely inside isolated, air-gapped, on-prem networks — where AI-driven tools simply can't go.
 - **Deterministic and reproducible.** The same scan yields the same result, every time.
 
 Why does that matter? **Because audit.** If your security result depends on a model that might answer differently tomorrow, you don't have an auditable result — you have an opinion. In a regulated environment, that doesn't fly. **[personal: if you've worked in regulated/financial/gov/health environments, say why reproducibility isn't negotiable there.]**

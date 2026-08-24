@@ -141,7 +141,7 @@ A target type with no engine is a config error, not an empty report.
 | `baseline` | — | Prior `yubel.json` to diff against. |
 | `fail_on` | — | Exit non-zero at or above this severity. |
 | `fail_on_new` | false | With `baseline`, gate only on new/regressed. |
-| `offline` | false | Air-gapped hardening. Today this reaches **nuclei only** (no OAST/interactsh, no template update check); the other engines ignore it. |
+| `offline` | false | Air-gapped hardening. Every engine either honours it with a verified switch or is **skipped**, with the reason written into the report. See the table below. |
 | `allow_internal` | false | Permit link-local (169.254/16 — the cloud metadata service), loopback and RFC1918 targets. Refused by default, including URLs the crawler discovers at runtime. A hostname is never resolved, so a name pointing at an internal address still passes. |
 | `output.dir` | yubel-report | Where reports are written. |
 | `output.formats` | json, html, markdown | Reporters to run (`md` is an alias for `markdown`). |
@@ -167,6 +167,33 @@ the crawler's run message — never a silent drop.
 Two things `scope` deliberately cannot do: it cannot re-admit an internal address
 (`allow_internal` is the only door there), and it cannot widen a scan beyond the crawler
 — it bounds discovery, it does not add targets.
+
+### What `--offline` actually does, per engine
+
+Generated from each adapter's own declaration, so it cannot drift from the code. An
+engine with no verified switch is **skipped** rather than run under a promise nobody
+checked, and the reason below is what the report shows in the *Why* column.
+
+| Engine | Under `--offline` | Flags | Why |
+|---|---|---|---|
+| `httpx` | runs | `-duc` | -duc disables the automatic update check |
+| `katana` | runs | `-duc` | -duc disables the automatic update check |
+| `zap` | runs | `-z` `-silent` | -z -silent stops all unsolicited requests; note it also skips the beta passive rules the wrapper would install |
+| `nuclei` | runs | `-ni` `-duc` | -ni disables OAST/interactsh callbacks, -duc the template update check |
+| `wapiti` | runs | `--no-bugreport` | --no-bugreport stops the crash report leaving the host |
+| `nikto` | runs | `-nolookup` | -nolookup disables DNS lookups; -ask no is always passed |
+| `dalfox` | **skipped** | — | no update-check switch could be verified for v2; the callback and remote-payload options are never passed |
+| `sqlmap` | **skipped** | — | no update-check switch could be verified |
+| `testssl` | runs | `--nodns` `none` | --nodns none; CRL/OCSP is opt-in and never requested |
+| `schemathesis` | runs | — | telemetry rides with --report, which is never passed |
+| `graphw00f` | runs | — | talks only to the target endpoint |
+| `graphql-cop` | runs | — | talks only to the target endpoint |
+| `kube-hunter` | runs | — | dispatches to stdout; the uploading plugin exists only in the vendor's :aqua image |
+
+ZAP's `-silent` has a cost worth knowing: the wrapper scripts read their own arguments
+and skip installing the beta passive rules when it is present, so an air-gapped ZAP run
+has fewer rules than an online one and can report fewer findings. That is what air-gapped
+means — including the part where you do not download rules mid-scan.
 
 ## Authentication
 

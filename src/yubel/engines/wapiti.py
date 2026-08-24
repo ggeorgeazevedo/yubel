@@ -27,6 +27,13 @@ class WapitiEngine(Engine):
     header_flag = "-H"
     default_timeout = 1500
     homepage = "https://wapiti-scanner.github.io/"
+    offline_ok = True
+    #: wapiti generates and *sends* a bug report when an attack module raises
+    #: an uncaught exception. That is a scan crashing on the operator's
+    #: target, transmitted off-site; --no-bugreport keeps it local. `--update`
+    #: is a manual action that exits, not a check on startup.
+    offline_args = ("--no-bugreport",)
+    offline_note = "--no-bugreport stops the crash report leaving the host"
 
     def build_command(self, target: Target, workdir: str) -> List[str]:
         out = os.path.join(workdir, "wapiti.json")
@@ -46,7 +53,7 @@ class WapitiEngine(Engine):
                     for arg in ("-H", f"{h[0]}: {h[1]}")]
         else:
             cmd += self.auth_args(target)
-        return cmd
+        return cmd + self.offline_flags()
 
     def parse(self, target: Target, workdir: str, stdout: str) -> List[Finding]:
         _sec = secrets_of(target.auth)
