@@ -168,7 +168,16 @@ def _cmd_engines(check: bool = False) -> int:
         avail = "yes" if eng.available() else "no"
         # for a scanner the version *is* the finding set, so "which one do I
         # have here" is not trivia — it is the difference between two runs
-        version = (eng.tool_version() or "?") if eng.available() else "—"
+        # three distinct answers, and collapsing them would be a small lie:
+        # "—" nothing installed to ask, "n/a" installed but has no version
+        # flag (kube-hunter prints usage if you try), "?" asked and the
+        # output carried no version.
+        if not eng.available():
+            version = "—"
+        elif not cls.version_args:
+            version = "n/a"
+        else:
+            version = eng.tool_version() or "?"
         if cls.unmaintained:
             stale.append(f"{cls.name} ({cls.unmaintained})")
         # whether credentials actually reach this engine — a scan that runs
