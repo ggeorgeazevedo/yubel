@@ -6,6 +6,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow
 
 ## [Unreleased]
 
+## [0.8.1] — 2026-08-24
+
+Supersedes 0.8.0, which was tagged on a commit that is not on `main`.
+
+### Fixed
+`v0.8.0` was created on a feature-branch commit that the squash-merge then
+discarded, so the tag names a commit reachable from no branch. The wheel it
+published is unaffected — the difference between that commit and `main` is
+`Dockerfile`, `docker.yml` and `CHANGELOG.md`, and nothing under `src/` or in
+`pyproject.toml` — so **PyPI 0.8.0 contains the correct code**. The container
+image is what was lost: that commit predates the `GOBIN` fix, so the arm64 leg
+of its build failed and no image was published for 0.8.0.
+
+PyPI does not allow republishing a version, so the tag could not be corrected,
+only superseded. 0.8.1 is `main` with no code changes beyond the guard below.
+
+### Added
+`release.yml` now refuses to publish a tag whose commit is not an ancestor of
+`main`, as a job every other job depends on. A release tag pointing anywhere
+else publishes code that was never on the branch — and, as this release shows,
+the mistake is not correctable after the fact.
+
 ## [0.8.0] — 2026-08-23
 
 ### Security
@@ -740,7 +762,8 @@ Initial public release.
   **382-tool DAST landscape** (`docs/LANDSCAPE.md` + `data/dast-landscape.csv`).
 - **Tests**: full pipeline coverage without network or external binaries.
 
-[Unreleased]: https://github.com/ggeorgeazevedo/yubel/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/ggeorgeazevedo/yubel/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.8.1
 [0.8.0]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.8.0
 [0.7.2]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.7.2
 [0.7.1]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.7.1

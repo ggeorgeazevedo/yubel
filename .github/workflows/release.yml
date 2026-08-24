@@ -12,7 +12,31 @@ permissions:
   id-token: write        # PyPI Trusted Publishing (OIDC, no API token needed)
 
 jobs:
+  # A release tag that does not point at `main` publishes code nobody reviewed
+  # on the branch. It happened: v0.8.0 was tagged on a feature-branch commit
+  # that the squash-merge then discarded, so the tag names a commit reachable
+  # from no branch — and the code it published was missing a fix that had
+  # already landed. PyPI does not allow republishing a version, so that tag
+  # could not be corrected, only superseded.
+  guard:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: The tagged commit must be on main
+        run: |
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "${GITHUB_SHA}" FETCH_HEAD; then
+            echo "::error::${GITHUB_REF_NAME} points at ${GITHUB_SHA}, which is not an ancestor of main. Tag a commit that is on main."
+            exit 1
+          fi
+          echo "${GITHUB_REF_NAME} -> ${GITHUB_SHA} is on main"
+
   build:
+    needs: guard
     runs-on: ubuntu-latest
     # The workflow grants `contents: write` and `id-token: write` because the
     # two publishing jobs below need them. This job needs neither, and it is
