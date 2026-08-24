@@ -29,7 +29,7 @@ Yubel runs the best open-source dynamic security engines — ZAP, Nuclei, Nikto,
 ---
 
 > ### 🛡️ Air-gapped by design
-> Yubel needs **no LLM and no cloud** to work. Its core makes **zero outbound calls** — it only ever talks to the targets you point it at — so results never leave your perimeter. Add `--offline` to harden the engines further — today that disables nuclei's OAST/interactsh callbacks and its template update check; the other engines are not covered yet, so treat it as defence in depth, not a guarantee. Runs fully inside regulated, isolated and on-prem networks where AI-driven tools simply can't go. **Deterministic, reproducible, auditable** — the same scan yields the same result, every time.
+> Yubel needs **no LLM and no cloud** to work. Its core makes **zero outbound calls** — it only ever talks to the targets you point it at — so results never leave your perimeter. Add `--offline` to harden the engines too: every engine either honours it with a switch verified against that tool's own documentation, or is **skipped**, with the reason written into the report. No engine runs under a promise nobody checked. Runs fully inside regulated, isolated and on-prem networks where AI-driven tools simply can't go. **Deterministic, reproducible, auditable** — the same scan yields the same result, every time.
 
 ---
 

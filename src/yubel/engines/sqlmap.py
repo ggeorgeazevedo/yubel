@@ -19,6 +19,13 @@ class SqlmapEngine(Engine):
     header_flag = "-H"
     default_timeout = 1200
     homepage = "https://sqlmap.org/"
+    #: Same reasoning as dalfox: no verified switch, so it is skipped rather
+    #: than run under a promise nobody checked. sqlmap is opt-in anyway, so
+    #: this combination is rare — but it used not to receive the offline
+    #: option at all, which is worse than being skipped: it ran, and nothing
+    #: said so.
+    offline_ok = False
+    offline_note = "no update-check switch could be verified"
     #: opt-in only — intrusive
     opt_in = True
 

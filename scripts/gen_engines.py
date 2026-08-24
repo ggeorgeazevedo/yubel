@@ -139,6 +139,22 @@ graphql-cop reacts to a header it cannot parse by printing one line and \
 carrying on —
 so getting it wrong drops the credentials without failing the run."""
 
+OFFLINE_INTRO = """\
+Generated from each adapter's own declaration, so it cannot drift from the \
+code. An
+engine with no verified switch is **skipped** rather than run under a promise \
+nobody
+checked, and the reason below is what the report shows in the *Why* column."""
+
+ZAP_SILENT_NOTE = """\
+ZAP's `-silent` has a cost worth knowing: the wrapper scripts read their own \
+arguments
+and skip installing the beta passive rules when it is present, so an \
+air-gapped ZAP run
+has fewer rules than an online one and can report fewer findings. That is what \
+air-gapped
+means — including the part where you do not download rules mid-scan."""
+
 #: Defaults are read off `Config` rather than typed here: this table used to
 #: claim `crawl_max_urls: 50` while the code said 150, which is the drift the
 #: rest of this generator exists to prevent.
@@ -164,9 +180,9 @@ info/low findings into one. |
 | `fail_on` | — | Exit non-zero at or above this severity. |
 | `fail_on_new` | {str(_D.fail_on_new).lower()} | With `baseline`, gate only \
 on new/regressed. |
-| `offline` | {str(_D.offline).lower()} | Air-gapped hardening. Today this \
-reaches **nuclei only** (no OAST/interactsh, no template update check); the \
-other engines ignore it. |
+| `offline` | {str(_D.offline).lower()} | Air-gapped hardening. Every engine \
+either honours it with a verified switch or is **skipped**, with the reason \
+written into the report. See the table below. |
 | `allow_internal` | {str(_D.allow_internal).lower()} | Permit link-local \
 (169.254/16 — the cloud metadata service), loopback and RFC1918 targets. \
 Refused by default, including URLs the crawler discovers at runtime. A \
@@ -301,6 +317,24 @@ def render() -> str:
         "## Top-level config keys",
         "",
         TOP_LEVEL.rstrip(),
+        "",
+        "### What `--offline` actually does, per engine",
+        "",
+        *OFFLINE_INTRO.splitlines(),
+        "",
+        "| Engine | Under `--offline` | Flags | Why |",
+        "|---|---|---|---|",
+    ]
+    for cls in ALL_ENGINES:
+        if cls.name == "demo":
+            continue
+        flags = " ".join(f"`{a}`" for a in cls.offline_args) or "—"
+        stance = "runs" if cls.offline_ok else "**skipped**"
+        lines.append(f"| `{cls.name}` | {stance} | {flags} | "
+                     f"{cls.offline_note} |")
+    lines += [
+        "",
+        *ZAP_SILENT_NOTE.splitlines(),
         "",
         "## Authentication",
         "",

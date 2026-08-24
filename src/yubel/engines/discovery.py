@@ -21,6 +21,9 @@ class KatanaEngine(Engine):
     binary = "katana"
     default_timeout = 600
     homepage = "https://github.com/projectdiscovery/katana"
+    offline_ok = True
+    offline_args = ("-duc",)
+    offline_note = "-duc disables the automatic update check"
 
     def build_command(self, target: Target, workdir: str) -> List[str]:
         out = os.path.join(workdir, "katana.jsonl")
@@ -35,7 +38,7 @@ class KatanaEngine(Engine):
             cmd += ["-kf", "all"]
         if self.options.get("headless"):
             cmd += ["-headless", "-no-sandbox"]
-        return cmd
+        return cmd + self.offline_flags()
 
     def parse(self, target: Target, workdir: str, stdout: str) -> List[Finding]:
         text = self._read(os.path.join(workdir, "katana.jsonl")) or stdout
@@ -87,12 +90,15 @@ class HttpxEngine(Engine):
     binary = "httpx"
     default_timeout = 300
     homepage = "https://github.com/projectdiscovery/httpx"
+    offline_ok = True
+    offline_args = ("-duc",)
+    offline_note = "-duc disables the automatic update check"
 
     def build_command(self, target: Target, workdir: str) -> List[str]:
         out = os.path.join(workdir, "httpx.jsonl")
         return [self.binary, "-u", target.endpoint(), "-json", "-o", out,
                 "-silent", "-title", "-tech-detect", "-status-code",
-                "-server", "-tls-grab"]
+                "-server", "-tls-grab", *self.offline_flags()]
 
     def parse(self, target: Target, workdir: str, stdout: str) -> List[Finding]:
         text = self._read(os.path.join(workdir, "httpx.jsonl")) or stdout

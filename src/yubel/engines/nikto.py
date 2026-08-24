@@ -16,6 +16,15 @@ class NiktoEngine(Engine):
     binary = "nikto"
     default_timeout = 900
     homepage = "https://github.com/sullo/nikto"
+    offline_ok = True
+    #: -nolookup stops reverse DNS on the addresses it sees. The other egress
+    #: nikto has — posting server version data back to cirt.net — is already
+    #: off in every run: `-ask no` is passed unconditionally in
+    #: build_command, and `send_updates` returns early unless UPDATES is
+    #: yes/auto. 2.5.0 has no startup update check to disable (`-nocheck`
+    #: arrived in 2.6.1).
+    offline_args = ("-nolookup",)
+    offline_note = "-nolookup disables DNS lookups; -ask no is always passed"
 
     def build_command(self, target: Target, workdir: str) -> List[str]:
         out = os.path.join(workdir, "nikto.json")
@@ -28,7 +37,7 @@ class NiktoEngine(Engine):
         tuning = self.options.get("tuning")
         if tuning:
             cmd += ["-Tuning", str(tuning)]
-        return cmd
+        return cmd + self.offline_flags()
 
     def parse(self, target: Target, workdir: str, stdout: str) -> List[Finding]:
         raw = self._read(os.path.join(workdir, "nikto.json"))

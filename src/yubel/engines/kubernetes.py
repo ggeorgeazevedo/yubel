@@ -27,6 +27,14 @@ class KubeHunterEngine(Engine):
     binary = "kube-hunter"
     default_timeout = 900
     homepage = "https://github.com/aquasecurity/kube-hunter"
+    offline_ok = True
+    #: The report goes to stdout by default; the `http` dispatcher is opt-in
+    #: through KUBEHUNTER_HTTP_DISPATCH_URL and this adapter never sets it.
+    #: One caveat that is not ours to fix in code: the `aquasec/kube-hunter`
+    #: image tagged `:aqua` bundles a closed-source plugin that uploads
+    #: results. Our image builds from the open-source Dockerfile.
+    offline_note = ("dispatches to stdout; the uploading plugin exists only "
+                    "in the vendor's :aqua image")
 
     def available(self) -> bool:
         return shutil.which("kube-hunter") is not None

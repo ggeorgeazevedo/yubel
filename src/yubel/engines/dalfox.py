@@ -28,6 +28,21 @@ class DalfoxEngine(Engine):
     header_flag = "-H"
     default_timeout = 900
     homepage = "https://github.com/hahwul/dalfox"
+    #: Skipped under --offline, and this one is a judgement call worth
+    #: recording. What *is* verified: the three flags that egress —
+    #: `-b` (blind XSS callback), `--remote-payloads`, `--remote-wordlists` —
+    #: all default to empty and this adapter never sets them. What could not
+    #: be verified is whether v2 checks for updates on startup; there is no
+    #: flag for it in `cmd/root.go` and no statement either way in the docs.
+    #:
+    #: So the choice is between running it and calling the scan offline on an
+    #: unchecked assumption, or skipping it and saying why. `--offline` is a
+    #: promise, and a promise you have not checked is the bug this whole
+    #: change is about. The report names the engine, the reason, and what
+    #: the operator loses.
+    offline_ok = False
+    offline_note = ("no update-check switch could be verified for v2; the "
+                    "callback and remote-payload options are never passed")
 
     _major = None  # cached detected major version
 
@@ -48,14 +63,10 @@ class DalfoxEngine(Engine):
         discovery we fall back to the seed endpoint, exactly as before."""
         rec = EngineRun(engine=self.name, target=target.label)
         rec.started_at = time.time()
-        if not self.handles(target):
+        reason = self.skip_reason(target)
+        if reason:
             rec.status = "skipped"
-            rec.message = f"does not handle target type {target.type}"
-            rec.finished_at = time.time()
-            return [], rec
-        if not self.available():
-            rec.status = "skipped"
-            rec.message = self.unavailable_reason()
+            rec.message = reason
             rec.finished_at = time.time()
             return [], rec
 

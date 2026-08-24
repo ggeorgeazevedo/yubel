@@ -16,6 +16,10 @@ class GraphwoofEngine(Engine):
     binary = "graphw00f"
     default_timeout = 180
     homepage = "https://github.com/dolevf/graphw00f"
+    offline_ok = True
+    #: `-f -d -t <endpoint>`: fingerprinting and detection against the target
+    #: and nothing else. Nothing to disable.
+    offline_note = "talks only to the target endpoint"
 
     def available(self) -> bool:
         return shutil.which("graphw00f") is not None
@@ -52,6 +56,9 @@ class GraphqlCopEngine(Engine):
     header_style = "json"
     default_timeout = 300
     homepage = "https://github.com/dolevf/graphql-cop"
+    offline_ok = True
+    #: `-t <endpoint> -o json`, plus headers. Nothing to disable.
+    offline_note = "talks only to the target endpoint"
 
     def available(self) -> bool:
         return shutil.which("graphql-cop") is not None

@@ -62,7 +62,43 @@ domain used to put real attack traffic on infrastructure nobody authorised.
 re-admit an internal address, because that is a safety rule rather than a
 scoping preference.
 
+`--offline` means offline, or the engine does not run. The flag set an option
+on a hand-written list of ten engines and exactly one — nuclei — ever read it.
+The other nine egressed exactly as before: ZAP checked the add-on marketplace,
+nikto did reverse DNS, wapiti would post a crash report off-site. Three engines
+(sqlmap, graphw00f, graphql-cop) were not on the list at all, so nothing had
+ever considered them. The reports said nothing about any of it, so the operator
+got the word and none of the property.
+
+Each adapter now declares its own stance — `offline_ok`, `offline_args`,
+`offline_note` — and every switch below was verified against that tool's own
+documentation or source before being written down, because a flag believed from
+memory is the same failure one level up: nuclei `-ni -duc`, ZAP `-z -silent`,
+nikto `-nolookup` (with `-ask no`, already always passed, covering the version
+POST to cirt.net), testssl `--nodns none`, wapiti `--no-bugreport`, katana and
+httpx `-duc`. schemathesis, graphw00f, graphql-cop and kube-hunter need no flag
+as this orchestrator invokes them, and each says why.
+
+dalfox and sqlmap are **skipped** under `--offline`: no update-check switch
+could be verified for either, and running them would mean calling the scan
+offline on an unchecked assumption. `docs/engines.md` now carries a
+generated-from-code table of exactly this, so it cannot drift.
+
+`--offline` also reaches every registered engine rather than a list maintained
+by hand next to a registry of engines, and `offline_ok` defaults to False, so a
+new adapter is skipped until someone looks into it.
+
+One cost worth stating: ZAP's `-silent` makes the wrapper skip installing the
+beta passive rules, so an air-gapped ZAP run has fewer rules than an online one
+and can report fewer findings. That is what air-gapped means.
+
 ### Fixed
+Skipped engine runs say why, in the reports and not only in `yubel.json`. The
+HTML and Markdown coverage tables showed `skipped` with no reason, which reads
+as housekeeping rather than "this engine was left out of your scan". Both now
+carry a *Why* column fed by the run record's message — the text was always
+there — and the HTML says how many runs did not execute.
+
 An unknown `k8s_mode` from YAML no longer produces a green scan that never
 scanned. `--k8s-mode` had argparse `choices`; the YAML path had nothing, so
 `k8s_mode: pods` fell past all three branches in `KubeHunterEngine`, which then

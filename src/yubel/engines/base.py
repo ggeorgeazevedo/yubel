@@ -37,6 +37,30 @@ class Engine:
     #: url the engine came from (for the manifest / credits)
     homepage: str = ""
 
+    # ---- `--offline` ----------------------------------------------------
+    # The flag used to be set on ten engines and read by one. The other nine
+    # egressed exactly as before and the report said nothing about it, so the
+    # operator got the word "offline" and none of the property. These three
+    # attributes make the stance per-engine, explicit and testable.
+    #
+    #: True when this engine, invoked the way this adapter invokes it, makes
+    #: no request that is not to the target — either because there is nothing
+    #: to disable, or because `offline_args` disables it. False means the
+    #: engine is SKIPPED under `--offline`, with `offline_note` as the reason
+    #: on the run record. False is the default deliberately: a new engine is
+    #: unproven until someone proves otherwise, and the failure mode being
+    #: fixed here is a promise nobody had checked.
+    offline_ok: bool = False
+    #: Flags that turn off non-target traffic. Each engine places them itself
+    #: in `build_command`, because position matters for tools with a
+    #: positional target; `test_offline.py` fails if a declared flag never
+    #: reaches the built command.
+    offline_args: Tuple[str, ...] = ()
+    #: Why this engine is safe offline, or why it cannot be shown to be.
+    #: Written onto the run record, so the report carries the reason rather
+    #: than a bare "skipped". Cite the switch or the evidence.
+    offline_note: str = "no switch for non-target traffic could be verified"
+
     def __init__(self, options: Optional[dict] = None):
         self.options = options or {}
 
@@ -147,17 +171,40 @@ class Engine:
     def timeout(self) -> int:
         return int(self.options.get("timeout", self.default_timeout))
 
+    def offline_flags(self) -> List[str]:
+        """`offline_args` when this run is offline, nothing otherwise.
+
+        Engines call this from `build_command` rather than having the base
+        append: testssl.sh takes its host as a trailing positional, so
+        "append at the end" is wrong for at least one engine and therefore
+        wrong as a rule. `test_offline.py` proves each declared flag reaches
+        the command it belongs to.
+        """
+        return list(self.offline_args) if self.options.get("offline") else []
+
+    def skip_reason(self, target: Target) -> Optional[str]:
+        """Why this engine will not run against this target, or None.
+
+        Three subclasses reimplement `run()` and each had its own copy of the
+        first two checks, so a fourth reason had to be added in three places
+        or silently miss two engines. It lives here now, and the contract
+        test walks every registered engine through it.
+        """
+        if not self.handles(target):
+            return f"does not handle target type {target.type}"
+        if not self.available():
+            return self.unavailable_reason()
+        if self.options.get("offline") and not self.offline_ok:
+            return f"--offline: {self.offline_note}"
+        return None
+
     def run(self, target: Target) -> Tuple[List[Finding], EngineRun]:
         rec = EngineRun(engine=self.name, target=target.label)
         rec.started_at = time.time()
-        if not self.handles(target):
+        reason = self.skip_reason(target)
+        if reason:
             rec.status = "skipped"
-            rec.message = f"does not handle target type {target.type}"
-            rec.finished_at = time.time()
-            return [], rec
-        if not self.available():
-            rec.status = "skipped"
-            rec.message = self.unavailable_reason()
+            rec.message = reason
             rec.finished_at = time.time()
             return [], rec
 

@@ -18,6 +18,8 @@ class DemoEngine(Engine):
     supports = tuple(TargetType)
     binary = ""  # always "available"
     homepage = "https://github.com/ggeorgeazevedo/yubel"
+    offline_ok = True
+    offline_note = "synthetic: no process, no network"
 
     def handles(self, target: Target) -> bool:
         return True
