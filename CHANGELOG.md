@@ -39,6 +39,29 @@ hold anyway — DNS answers change between check and request), and
 `options.nuclei.extra_args` still concatenates into the argv, which is what an
 escape hatch is.
 
+`scope` and `exclude` do something. For the whole life of the project both were
+parsed into `Target` and consulted by nothing, while `SECURITY.md` listed them
+under "Safe defaults" and told operators to bound a scan with them. A scope
+field that exists and does nothing is worse than one that does not exist: the
+missing one raises an error, the present one gives a false assurance.
+
+They now bound the one part of a scan that grows without the operator saying
+so — the URLs the crawler discovers. `scope` matches the **host** of a
+discovered URL; `exclude` matches the **whole URL** and outranks `scope`, which
+is how you keep the crawler off `/logout` or an endpoint that emails every user.
+Both are validated before the scan starts, so a broken regex fails at
+`validate()` instead of surfacing as `re.error` from a worker thread halfway
+through a run, and a scope that matches none of the operator's own hosts is
+called out rather than quietly meaning "discover nothing".
+
+With neither set the default is containment: a discovered URL on a host other
+than the target's own is not scanned. katana follows off-site links and pulls
+routes out of JS bundles, so a link to a CDN, an analytics host or a partner
+domain used to put real attack traffic on infrastructure nobody authorised.
+`scope` is how you say the other host is yours — and it deliberately cannot
+re-admit an internal address, because that is a safety rule rather than a
+scoping preference.
+
 ### Fixed
 An unknown `k8s_mode` from YAML no longer produces a green scan that never
 scanned. `--k8s-mode` had argparse `choices`; the YAML path had nothing, so

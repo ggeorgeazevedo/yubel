@@ -177,13 +177,35 @@ passes. |
 is an alias for `markdown`). |
 | `output.sarif` | {str(_D.output.sarif).lower()} | Also emit `yubel.sarif`. |
 
-Two per-target keys are parsed and then **ignored**: `scope` and `exclude` are \
-read into
-`Target.scope` / `Target.exclude`, and no engine consults them — so a config \
-that sets
-them is not scoped in any way. They are accepted rather than rejected only \
-because
-rejecting would break existing files; treat them as not implemented.
+### Bounding a scan: `scope` and `exclude`
+
+Both are per-target lists of regexes, and both bound the one part of a scan \
+that grows
+without the operator saying so — the URLs the crawler discovers. Every other \
+target is
+one somebody wrote down.
+
+| Key | Matched against | Meaning |
+|---|---|---|
+| `scope` | the **host** of a discovered URL | Hosts other than the target's \
+own that are also yours. |
+| `exclude` | the **whole URL** | Never scan this. Outranks `scope`. |
+
+With neither set, the default is containment: a discovered URL on a host other \
+than the
+target's own is not scanned. katana follows off-site links and extracts routes \
+from JS
+bundles, so without this a link to a CDN, an analytics host or a partner domain \
+puts real
+attack traffic on infrastructure nobody authorised. Refusals are counted and \
+written to
+the crawler's run message — never a silent drop.
+
+Two things `scope` deliberately cannot do: it cannot re-admit an internal \
+address
+(`allow_internal` is the only door there), and it cannot widen a scan beyond \
+the crawler
+— it bounds discovery, it does not add targets.
 """
 
 

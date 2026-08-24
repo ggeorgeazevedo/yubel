@@ -187,15 +187,32 @@ def test_the_refusal_is_recorded_not_just_dropped():
     Orchestrator(Config(targets=[target]))._seed_from_discovery(result)
 
     run = next(r for r in result.runs if r.engine == "katana")
-    assert "refused as internal" in run.message
+    assert "not scanned" in run.message
     assert "127.0.0.1" in run.message
 
 
 def test_allow_internal_reaches_the_crawler_seam_too():
-    target = Target(type=TargetType.WEB, url="https://example.com", name="site")
+    """With the flag set, an internal address on the target's own host is
+    scanned. Note what is still required: the host has to be the target's, or
+    named in `scope` — `--allow-internal` answers "is this address allowed",
+    not "is this host mine"."""
+    target = Target(type=TargetType.WEB, url="http://10.0.0.9/", name="site")
     cfg = Config(targets=[target], allow_internal=True)
     result = _crawled(["http://10.0.0.9/admin"])
 
     Orchestrator(cfg)._seed_from_discovery(result)
 
     assert target.seed_urls == ["http://10.0.0.9/admin"]
+
+
+def test_allow_internal_does_not_open_a_different_host():
+    """The two rules are independent, and this is the one that would be a
+    nasty surprise: an authorized internal pentest must not turn the crawler
+    loose on every RFC1918 address it finds a link to."""
+    target = Target(type=TargetType.WEB, url="http://10.0.0.9/", name="site")
+    cfg = Config(targets=[target], allow_internal=True)
+    result = _crawled(["http://10.0.0.250/admin"])
+
+    Orchestrator(cfg)._seed_from_discovery(result)
+
+    assert target.seed_urls == []

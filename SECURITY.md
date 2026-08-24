@@ -28,11 +28,17 @@ Safe defaults:
   internal assessment. Note the limit: **a hostname is never resolved**, so a
   name pointing at an internal address still passes. This refuses what can be
   refused by inspection, not everything internal that is reachable.
-- **`scope` and `exclude` are not implemented.** They are accepted in a
-  target and read by no engine, so a config that sets them is not scoped in
-  any way. Do not rely on them to bound a scan; bound it by pointing Yubel
-  only at hosts you are authorised to test. Tracked in
-  [#18](https://github.com/ggeorgeazevedo/yubel/issues/18).
+- **The crawler cannot leave the target's host.** A URL discovered on another
+  host is not scanned unless that host matches the target's `scope`. katana
+  follows off-site links and extracts routes from JS bundles, so without this
+  a link to a CDN, an analytics host or a partner domain would put real attack
+  traffic on infrastructure nobody authorised.
+- **`scope` and `exclude` bound the crawler.** `scope` is a list of regexes
+  matched against the **host** of a discovered URL; `exclude` is matched
+  against the **whole URL** and outranks `scope`, which is how you keep the
+  crawler off `/logout` or an endpoint that emails every user. Both are
+  validated before the scan starts. They bound discovery — they do not add
+  targets, and `scope` cannot re-admit an internal address.
 
 ## Reporting a vulnerability in Yubel
 
