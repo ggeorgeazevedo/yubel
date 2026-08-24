@@ -80,7 +80,7 @@ inputs:
   image:
     description: "Container image to run (defaults to the image built for this action's version)"
     required: false
-    default: "ghcr.io/ggeorgeazevedo/yubel:0.8.1"
+    default: "ghcr.io/ggeorgeazevedo/yubel:0.9.0"
   upload-sarif:
     description: >-
       Upload yubel.sarif to GitHub code scanning. Requires the calling job to

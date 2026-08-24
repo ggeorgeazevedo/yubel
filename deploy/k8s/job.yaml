@@ -32,7 +32,7 @@ spec:
           # Pinned, not `latest`: the scanner version decides the finding set,
           # so the same manifest applied three months apart would be a
           # different scan with nothing recording the difference.
-          image: ghcr.io/ggeorgeazevedo/yubel:0.8.1
+          image: ghcr.io/ggeorgeazevedo/yubel:0.9.0
           imagePullPolicy: IfNotPresent
           args: ["scan", "-c", "/config/yubel.yaml", "-o", "/out"]
           securityContext:

@@ -6,6 +6,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-08-24
+
+Five changes with one shape between them: a control the documentation
+promised, the code did not deliver, and nothing reported as missing. A scan
+that quietly does less than it says is worse than one that fails, because it
+is indistinguishable from a clean result.
+
 ### Security
 Yubel refuses to be aimed at the infrastructure running it. Nothing stopped
 `yubel scan -t http://169.254.169.254/latest/meta-data/iam/security-credentials/`
@@ -916,7 +923,8 @@ Initial public release.
   **382-tool DAST landscape** (`docs/LANDSCAPE.md` + `data/dast-landscape.csv`).
 - **Tests**: full pipeline coverage without network or external binaries.
 
-[Unreleased]: https://github.com/ggeorgeazevedo/yubel/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/ggeorgeazevedo/yubel/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.9.0
 [0.8.1]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.8.1
 [0.8.0]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.8.0
 [0.7.2]: https://github.com/ggeorgeazevedo/yubel/releases/tag/v0.7.2

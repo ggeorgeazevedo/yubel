@@ -35,6 +35,21 @@ jobs:
           fi
           echo "${GITHUB_REF_NAME} -> ${GITHUB_SHA} is on main"
 
+      # On main is not the same as being the release commit. `v0.9.0` was
+      # tagged one merge too early, on a tree that still declared 0.8.1: the
+      # guard above passed, the build packaged 0.8.1, and PyPI refused it only
+      # because that exact filename already existed. A published image had
+      # already gone out tagged 0.9.0 with 0.8.1 inside. The tag has to name
+      # the version the tree declares, and that is three seconds to check.
+      - name: The tag must name the version this tree declares
+        run: |
+          declared="$(grep -m1 '^version' pyproject.toml | cut -d'"' -f2)"
+          if [ "${GITHUB_REF_NAME}" != "v${declared}" ]; then
+            echo "::error::${GITHUB_REF_NAME} does not match the version in pyproject.toml (${declared}). Merge the release commit before tagging, or tag v${declared}."
+            exit 1
+          fi
+          echo "${GITHUB_REF_NAME} matches pyproject version ${declared}"
+
   build:
     needs: guard
     runs-on: ubuntu-latest

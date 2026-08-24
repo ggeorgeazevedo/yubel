@@ -120,6 +120,25 @@ def test_the_guard_actually_tests_ancestry():
         "a shallow checkout has no history to compute ancestry against")
 
 
+def test_the_guard_checks_the_tag_against_the_declared_version():
+    """On main is not the same as being the release commit.
+
+    `v0.9.0` was tagged one merge too early, on a tree that still said 0.8.1.
+    The ancestry check passed — the commit *was* on main — the build packaged
+    0.8.1 under a 0.9.0 release, and the only thing that stopped it reaching
+    PyPI was that the filename already existed there. An image had already
+    been published tagged 0.9.0 with 0.8.1 inside.
+
+    Two guards, because they catch different mistakes: one says the commit is
+    on the branch, the other says the tag names what the tree declares.
+    """
+    text = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+    guard = text.split("guard:", 1)[1].split("\n  build:", 1)[0]
+    assert "pyproject.toml" in guard, (
+        "the guard does not compare the tag against the declared version")
+    assert 'v${declared}' in guard
+
+
 def test_release_build_tools_are_version_pinned():
     text = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
     for tool in ("build", "twine"):
