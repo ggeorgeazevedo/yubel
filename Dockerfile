@@ -36,6 +36,13 @@ ARG ZAP_VERSION=2.17.0
 ARG NIKTO_VERSION=2.6.1
 ARG TESTSSL_VERSION=v3.2.4
 ARG GRAPHQL_COP_VERSION=1.16
+# schemathesis 4.x is a different CLI: `--hypothesis-max-examples` became
+# `-n`, `--base-url` became `-u`, and `--report json` no longer exists.
+# The adapter speaks 3.x and reports itself unavailable on 4.x, so the
+# image pins the line it can actually drive.
+ARG SCHEMATHESIS_VERSION=3.39.16
+ARG GRAPHW00F_VERSION=0.0.1
+ARG KUBE_HUNTER_VERSION=0.6.8
 
 # ---- stage 1: Go-based ProjectDiscovery + XSS tooling ----------------------
 # --platform=$BUILDPLATFORM keeps this stage on the *builder's* architecture
@@ -144,17 +151,24 @@ RUN set -eux; \
         https://github.com/dolevf/graphql-cop.git /opt/graphql-cop; \
     chmod +x /opt/graphql-cop/graphql-cop.py; \
     ln -s /opt/graphql-cop/graphql-cop.py /usr/local/bin/graphql-cop; \
-    pip install --no-cache-dir requests simplejson termcolor PySocks; \
+    pip install --no-cache-dir 'requests==2.34.2' 'simplejson==4.1.1' \
+        'termcolor==3.3.0' 'PySocks==1.7.1'; \
     graphql-cop --version
 
 # Python-based engines.
 # NB: netifaces (a kube-hunter dependency) is a C extension with no prebuilt
 # wheel for Python 3.12, so it must be compiled. build-essential is installed
 # only for the build and purged in the same layer to keep the image slim.
+ARG SCHEMATHESIS_VERSION
+ARG GRAPHW00F_VERSION
+ARG KUBE_HUNTER_VERSION
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends build-essential; \
-    pip install --no-cache-dir schemathesis graphw00f kube-hunter; \
+    pip install --no-cache-dir \
+        "schemathesis==${SCHEMATHESIS_VERSION}" \
+        "graphw00f==${GRAPHW00F_VERSION}" \
+        "kube-hunter==${KUBE_HUNTER_VERSION}"; \
     apt-get purge -y build-essential; \
     apt-get autoremove -y; \
     rm -rf /var/lib/apt/lists/*
